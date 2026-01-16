@@ -22,8 +22,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { useDataSync, useAutoRefresh } from "@/hooks/use-data-sync"
 import type { Movement, Card as CardType, Location, Bank } from "@/lib/types"
-import { Filter } from "lucide-react"
+import { Filter, ChevronLeft, ChevronRight } from "lucide-react"
 import { getAuthHeaders } from "@/lib/api-client"
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination"
 
 export default function MovementsManagement() {
   const [movements, setMovements] = useState<Movement[]>([])
@@ -31,6 +40,7 @@ export default function MovementsManagement() {
   const [locations, setLocations] = useState<Location[]>([])
   const [banks, setBanks] = useState<Bank[]>([])
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [logoPath, setLogoPath] = useState<string>('/placeholder-logo.png')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [formData, setFormData] = useState({
     bankId: "",
@@ -53,38 +63,46 @@ export default function MovementsManagement() {
     bankId: "all",
     cardId: "all",
     movementType: "all",
+    fromLocationId: "all",
+    toLocationId: "all",
     dateFrom: "",
     dateTo: "",
     searchTerm: ""
   })
 
+  // États pour la pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalMovements, setTotalMovements] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const movementsPerPage = 30
+
   useEffect(() => {
-    loadData()
     loadCurrentUser()
+    // Charger les cartes, emplacements et banques une seule fois
+    loadCardsLocationsBanks()
+    // Charger la configuration pour le logo
+    loadConfig()
   }, [])
 
-  const loadCurrentUser = () => {
+  const loadConfig = async () => {
     try {
-      // Récupérer l'utilisateur connecté depuis localStorage
-      const userStr = localStorage.getItem('currentUser')
-      if (userStr) {
-        const user = JSON.parse(userStr)
-        setCurrentUser(user)
+      const configResponse = await fetch('/api/config')
+      const configData = await configResponse.json()
+      if (configData.success && configData.data?.general?.logo) {
+        setLogoPath(configData.data.general.logo)
       }
     } catch (error) {
-      console.error('Error loading current user:', error)
+      console.error('Error loading config:', error)
     }
   }
 
-  const loadData = async () => {
-    try {
-      // Charger les mouvements
-      const movementsResponse = await fetch('/api/movements')
-      const movementsData = await movementsResponse.json()
-      if (movementsData.success) {
-        setMovements(movementsData.data || [])
-      }
+  // Recharger les mouvements quand les filtres ou la page changent
+  useEffect(() => {
+    loadMovements()
+  }, [filters, currentPage])
 
+  const loadCardsLocationsBanks = async () => {
+    try {
       // Charger les cartes
       const cardsResponse = await fetch('/api/cards')
       const cardsData = await cardsResponse.json()
@@ -106,12 +124,85 @@ export default function MovementsManagement() {
         setBanks(banksData.data || [])
       }
     } catch (error) {
-      console.error('Error loading data:', error)
+      console.error('Error loading cards/locations/banks:', error)
     }
   }
 
-  useDataSync(["movements", "cards", "locations", "banks"], loadData)
-  useAutoRefresh(loadData, 120000) // 2 minutes
+  const loadMovements = async () => {
+    try {
+      // Construire les paramètres de requête avec filtres et pagination
+      const params = new URLSearchParams()
+      
+      // Ajouter les filtres
+      if (filters.bankId && filters.bankId !== "all") {
+        params.append('bankId', filters.bankId)
+      }
+      if (filters.cardId && filters.cardId !== "all") {
+        params.append('cardId', filters.cardId)
+      }
+      if (filters.movementType && filters.movementType !== "all") {
+        params.append('type', filters.movementType)
+      }
+      if (filters.fromLocationId && filters.fromLocationId !== "all") {
+        params.append('fromLocationId', filters.fromLocationId)
+      }
+      if (filters.toLocationId && filters.toLocationId !== "all") {
+        params.append('toLocationId', filters.toLocationId)
+      }
+      if (filters.dateFrom) {
+        params.append('dateFrom', filters.dateFrom)
+      }
+      if (filters.dateTo) {
+        params.append('dateTo', filters.dateTo)
+      }
+      if (filters.searchTerm) {
+        params.append('searchTerm', filters.searchTerm)
+      }
+      
+      // Ajouter la pagination
+      params.append('page', currentPage.toString())
+      params.append('limit', movementsPerPage.toString())
+
+      // Charger les mouvements avec filtres et pagination
+      const movementsResponse = await fetch(`/api/movements?${params.toString()}`)
+      const movementsData = await movementsResponse.json()
+      if (movementsData.success && movementsData.data) {
+        // S'assurer que movements est toujours un tableau
+        const movementsArray = Array.isArray(movementsData.data.movements) 
+          ? movementsData.data.movements 
+          : (Array.isArray(movementsData.data) ? movementsData.data : [])
+        setMovements(movementsArray)
+        setTotalMovements(movementsData.data.total || 0)
+        setTotalPages(movementsData.data.totalPages || 1)
+      } else {
+        // En cas d'erreur, s'assurer que movements reste un tableau vide
+        setMovements([])
+      }
+    } catch (error) {
+      console.error('Error loading movements:', error)
+      // En cas d'erreur, s'assurer que movements reste un tableau vide
+      setMovements([])
+      setTotalMovements(0)
+      setTotalPages(1)
+    }
+  }
+
+  const loadCurrentUser = () => {
+    try {
+      // Récupérer l'utilisateur connecté depuis localStorage
+      const userStr = localStorage.getItem('currentUser')
+      if (userStr) {
+        const user = JSON.parse(userStr)
+        setCurrentUser(user)
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error)
+    }
+  }
+
+  // Synchronisation automatique des mouvements
+  useDataSync(["movements"], loadMovements)
+  useAutoRefresh(loadMovements, 120000) // 2 minutes
 
   const getCardName = (cardId: string) => {
     const card = cards.find((c) => c.id === cardId)
@@ -125,7 +216,7 @@ export default function MovementsManagement() {
 
   const getUserName = (userId: string) => {
     // Récupérer le nom depuis le mouvement qui contient déjà les infos user
-    const movement = movements.find(m => m.userId === userId)
+    const movement = Array.isArray(movements) ? movements.find(m => m.userId === userId) : null
     if (movement && (movement as any).user) {
       const user = (movement as any).user
       return `${user.firstName} ${user.lastName}`
@@ -169,12 +260,77 @@ export default function MovementsManagement() {
     }
   }
 
-  const printMovementSlip = () => {
+  const printMovementSlip = async () => {
     if (!currentUser) return
-    const printWindow = window.open("", "_blank")
-    if (!printWindow) return
+    
+    try {
+      // Charger TOUS les mouvements correspondant aux filtres (sans pagination)
+      const params = new URLSearchParams()
+      
+      if (filters.bankId && filters.bankId !== "all") {
+        params.append('bankId', filters.bankId)
+      }
+      if (filters.cardId && filters.cardId !== "all") {
+        params.append('cardId', filters.cardId)
+      }
+      if (filters.movementType && filters.movementType !== "all") {
+        params.append('type', filters.movementType)
+      }
+      if (filters.fromLocationId && filters.fromLocationId !== "all") {
+        params.append('fromLocationId', filters.fromLocationId)
+      }
+      if (filters.toLocationId && filters.toLocationId !== "all") {
+        params.append('toLocationId', filters.toLocationId)
+      }
+      if (filters.dateFrom) {
+        params.append('dateFrom', filters.dateFrom)
+      }
+      if (filters.dateTo) {
+        params.append('dateTo', filters.dateTo)
+      }
+      if (filters.searchTerm) {
+        params.append('searchTerm', filters.searchTerm)
+      }
+      
+      // Charger tous les résultats (limite élevée pour obtenir tous les mouvements)
+      params.append('limit', '10000')
+      params.append('page', '1')
 
-    const movementsHtml = movements
+      const movementsResponse = await fetch(`/api/movements?${params.toString()}`)
+      const movementsData = await movementsResponse.json()
+      
+      let movementsToPrint: Movement[] = []
+      if (movementsData.success && movementsData.data) {
+        movementsToPrint = Array.isArray(movementsData.data.movements) 
+          ? movementsData.data.movements 
+          : []
+      }
+      
+      const printWindow = window.open("", "_blank")
+      if (!printWindow) return
+
+      // Formater la période pour l'affichage
+      const formatPeriod = () => {
+        if (filters.dateFrom || filters.dateTo) {
+          const dateFromStr = filters.dateFrom 
+            ? new Date(filters.dateFrom).toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' })
+            : null
+          const dateToStr = filters.dateTo 
+            ? new Date(filters.dateTo).toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' })
+            : null
+          
+          if (dateFromStr && dateToStr) {
+            return `Du ${dateFromStr} au ${dateToStr}`
+          } else if (dateFromStr) {
+            return `À partir du ${dateFromStr}`
+          } else if (dateToStr) {
+            return `Jusqu'au ${dateToStr}`
+          }
+        }
+        return "Ensemble de la période"
+      }
+
+      const movementsHtml = movementsToPrint
       .slice()
       .reverse()
       .map(
@@ -204,7 +360,85 @@ export default function MovementsManagement() {
       )
       .join("")
 
-    const htmlContent = `
+      // Calculer les statistiques basées sur les mouvements filtrés
+      // movementsToPrint contient déjà uniquement les mouvements correspondant aux filtres
+      // donc on peut calculer directement sans revérifier les filtres
+      const statsByBank = new Map<string, number>()
+      const statsByCardType = new Map<string, number>()
+      const statsByLocation = new Map<string, number>()
+      const statsByMovementType = new Map<string, number>()
+
+      movementsToPrint.forEach((movement) => {
+        const card = cards.find(c => c.id === movement.cardId)
+        const bank = card ? banks.find(b => b.id === card.bankId) : null
+        const bankName = bank?.name || "Banque inconnue"
+        const cardType = card?.type || "Type inconnu"
+        const fromLocation = movement.fromLocationId ? getLocationName(movement.fromLocationId) : null
+        const toLocation = movement.toLocationId ? getLocationName(movement.toLocationId) : null
+        const movementTypeLabel = getMovementTypeLabel(movement.movementType)
+
+        // Statistiques par banque - tous les mouvements dans movementsToPrint sont déjà filtrés
+        const bankTotal = statsByBank.get(bankName) || 0
+        statsByBank.set(bankName, bankTotal + movement.quantity)
+
+        // Statistiques par type de carte - tous les mouvements dans movementsToPrint sont déjà filtrés
+        const cardTypeTotal = statsByCardType.get(cardType) || 0
+        statsByCardType.set(cardType, cardTypeTotal + movement.quantity)
+
+        // Statistiques par emplacement source (De) - tous les mouvements dans movementsToPrint sont déjà filtrés
+        if (fromLocation) {
+          const fromTotal = statsByLocation.get(`De: ${fromLocation}`) || 0
+          statsByLocation.set(`De: ${fromLocation}`, fromTotal + movement.quantity)
+        }
+
+        // Statistiques par emplacement destination (Vers) - tous les mouvements dans movementsToPrint sont déjà filtrés
+        if (toLocation) {
+          const toTotal = statsByLocation.get(`Vers: ${toLocation}`) || 0
+          statsByLocation.set(`Vers: ${toLocation}`, toTotal + movement.quantity)
+        }
+
+        // Statistiques par type de mouvement - tous les mouvements dans movementsToPrint sont déjà filtrés
+        const movementTypeTotal = statsByMovementType.get(movementTypeLabel) || 0
+        statsByMovementType.set(movementTypeLabel, movementTypeTotal + movement.quantity)
+      })
+
+      // Générer les tableaux de statistiques HTML
+      const statsByBankHtml = Array.from(statsByBank.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([bank, total]) => `
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 8px;">${bank}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${total.toLocaleString('fr-FR')}</td>
+          </tr>
+        `).join('')
+
+      const statsByCardTypeHtml = Array.from(statsByCardType.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([cardType, total]) => `
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 8px;">${cardType}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${total.toLocaleString('fr-FR')}</td>
+          </tr>
+        `).join('')
+
+      const statsByLocationHtml = Array.from(statsByLocation.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([location, total]) => `
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 8px;">${location}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${total.toLocaleString('fr-FR')}</td>
+          </tr>
+        `).join('')
+
+      const statsByMovementTypeHtml = Array.from(statsByMovementType.entries())
+        .map(([movementType, total]) => `
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 8px;">${movementType}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${total.toLocaleString('fr-FR')}</td>
+          </tr>
+        `).join('')
+
+      const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -214,15 +448,54 @@ export default function MovementsManagement() {
               font-family: Arial, sans-serif;
               padding: 20px;
             }
-            h1 {
+            .header-container {
+              display: flex;
+              align-items: center;
+              margin-bottom: 20px;
+              border-bottom: 2px solid #1e293b;
+              padding-bottom: 15px;
+            }
+            .logo-container {
+              flex: 0 0 auto;
+              margin-right: 20px;
+            }
+            .logo-container img {
+              max-height: 80px;
+              max-width: 150px;
+              object-fit: contain;
+            }
+            .header-text {
+              flex: 1;
               text-align: center;
+            }
+            h1 {
               color: #1e293b;
-              margin-bottom: 10px;
+              margin: 0 0 5px 0;
+              font-size: 24px;
+            }
+            h2 {
+              color: #1e293b;
+              margin: 0;
+              font-size: 18px;
+              font-weight: normal;
             }
             .header-info {
               text-align: center;
               margin-bottom: 20px;
               color: #64748b;
+              background-color: #f8fafc;
+              padding: 15px;
+              border-radius: 8px;
+            }
+            .header-info p {
+              margin: 5px 0;
+              font-size: 14px;
+            }
+            .period-info {
+              font-weight: bold;
+              color: #1e293b;
+              font-size: 15px;
+              margin: 10px 0;
             }
             table {
               width: 100%;
@@ -262,20 +535,74 @@ export default function MovementsManagement() {
               color: #64748b;
               font-size: 12px;
             }
+            .stats-section {
+              margin-top: 30px;
+              margin-bottom: 30px;
+            }
+            .stats-section h3 {
+              color: #1e293b;
+              font-size: 18px;
+              margin-bottom: 15px;
+              border-bottom: 2px solid #1e293b;
+              padding-bottom: 8px;
+            }
+            .stats-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 20px;
+              margin-top: 20px;
+            }
+            .stats-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            .stats-table th {
+              background-color: #1e293b;
+              color: white;
+              padding: 10px;
+              text-align: left;
+              font-size: 14px;
+            }
+            .stats-table td {
+              padding: 8px;
+              border: 1px solid #ddd;
+              font-size: 13px;
+            }
+            .stats-table tr:nth-child(even) {
+              background-color: #f8fafc;
+            }
             @media print {
               button {
                 display: none;
+              }
+              .header-container {
+                page-break-inside: avoid;
+              }
+              .stats-section {
+                page-break-inside: avoid;
               }
             }
           </style>
         </head>
         <body>
-          <h1>Société Monétique Tunisie</h1>
-          <h2 style="text-align: center; color: #1e293b; margin-bottom: 20px;">Bordereau de Mouvements de Stock</h2>
+          <div class="header-container">
+            <div class="logo-container">
+              <img src="${logoPath}" alt="Logo Société Monétique Tunisie" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="max-height: 80px; max-width: 150px; object-fit: contain;">
+              <div style="display: none; width: 150px; height: 80px; background-color: #1e293b; color: white; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; border-radius: 4px;">
+                SMT
+              </div>
+            </div>
+            <div class="header-text">
+              <h1>Société Monétique Tunisie</h1>
+              <h2>Bordereau de Mouvements de Stock</h2>
+            </div>
+          </div>
           <div class="header-info">
-            <p>Généré le ${new Date().toLocaleString("fr-FR")}</p>
-            <p>Bon de mouvement généré par : ${currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "N/A"}</p>
-            <p>Total: ${movements.length} mouvement(s)</p>
+            <p><strong>Généré le :</strong> ${new Date().toLocaleString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+            <p><strong>Généré par :</strong> ${currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "N/A"}</p>
+            <p class="period-info"><strong>Période :</strong> ${formatPeriod()}</p>
+            <p><strong>Total :</strong> ${movementsToPrint.length} mouvement${movementsToPrint.length > 1 ? 's' : ''}</p>
           </div>
           <table>
             <thead>
@@ -294,6 +621,84 @@ export default function MovementsManagement() {
               ${movementsHtml}
             </tbody>
           </table>
+          
+          <!-- Section des statistiques -->
+          <div class="stats-section">
+            <h3>Statistiques des Mouvements</h3>
+            <div class="stats-grid">
+              <!-- Statistiques par banque -->
+              ${statsByBank.size > 0 ? `
+              <div>
+                <h4 style="color: #1e293b; font-size: 16px; margin-bottom: 10px;">Quantité totale par banque</h4>
+                <table class="stats-table">
+                  <thead>
+                    <tr>
+                      <th>Banque</th>
+                      <th style="text-align: right;">Quantité</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${statsByBankHtml}
+                  </tbody>
+                </table>
+              </div>
+              ` : ''}
+              
+              <!-- Statistiques par type de carte -->
+              ${statsByCardType.size > 0 ? `
+              <div>
+                <h4 style="color: #1e293b; font-size: 16px; margin-bottom: 10px;">Quantité totale par type de carte</h4>
+                <table class="stats-table">
+                  <thead>
+                    <tr>
+                      <th>Type de carte</th>
+                      <th style="text-align: right;">Quantité</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${statsByCardTypeHtml}
+                  </tbody>
+                </table>
+              </div>
+              ` : ''}
+              
+              <!-- Statistiques par emplacement -->
+              ${statsByLocation.size > 0 ? `
+              <div>
+                <h4 style="color: #1e293b; font-size: 16px; margin-bottom: 10px;">Quantité totale par emplacement</h4>
+                <table class="stats-table">
+                  <thead>
+                    <tr>
+                      <th>Emplacement</th>
+                      <th style="text-align: right;">Quantité</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${statsByLocationHtml}
+                  </tbody>
+                </table>
+              </div>
+              ` : ''}
+              
+              <!-- Statistiques par type de mouvement -->
+              ${statsByMovementType.size > 0 ? `
+              <div>
+                <h4 style="color: #1e293b; font-size: 16px; margin-bottom: 10px;">Quantité totale par type de mouvement</h4>
+                <table class="stats-table">
+                  <thead>
+                    <tr>
+                      <th>Type de mouvement</th>
+                      <th style="text-align: right;">Quantité</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${statsByMovementTypeHtml}
+                  </tbody>
+                </table>
+              </div>
+              ` : ''}
+            </div>
+          </div>
           
           <div class="recipient-section" style="margin-top: 40px; padding: 20px; border-top: 2px solid #1e293b;">
             <h3 style="color: #1e293b; margin-bottom: 30px;">Destinataire :</h3>
@@ -335,10 +740,14 @@ export default function MovementsManagement() {
           </script>
         </body>
       </html>
-    `
+      `
 
-    printWindow.document.write(htmlContent)
-    printWindow.document.close()
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+    } catch (error) {
+      console.error('Error loading movements for print:', error)
+      alert('Erreur lors du chargement des mouvements pour l\'impression')
+    }
   }
 
   const printSingleMovement = (movement: Movement) => {
@@ -402,15 +811,48 @@ export default function MovementsManagement() {
               max-width: 800px;
               margin: 0 auto;
             }
-            h1 {
+            .header-container {
+              display: flex;
+              align-items: center;
+              margin-bottom: 20px;
+              border-bottom: 2px solid #1e293b;
+              padding-bottom: 15px;
+            }
+            .logo-container {
+              flex: 0 0 auto;
+              margin-right: 20px;
+            }
+            .logo-container img {
+              max-height: 80px;
+              max-width: 150px;
+              object-fit: contain;
+            }
+            .header-text {
+              flex: 1;
               text-align: center;
+            }
+            h1 {
               color: #1e293b;
-              margin-bottom: 10px;
+              margin: 0 0 5px 0;
+              font-size: 24px;
+            }
+            h2 {
+              color: #1e293b;
+              margin: 0;
+              font-size: 18px;
+              font-weight: normal;
             }
             .header-info {
               text-align: center;
               margin-bottom: 30px;
               color: #64748b;
+              background-color: #f8fafc;
+              padding: 15px;
+              border-radius: 8px;
+            }
+            .header-info p {
+              margin: 5px 0;
+              font-size: 14px;
             }
             table {
               width: 100%;
@@ -449,15 +891,28 @@ export default function MovementsManagement() {
               button {
                 display: none;
               }
+              .header-container {
+                page-break-inside: avoid;
+              }
             }
           </style>
         </head>
         <body>
-          <h1>Société Monétique Tunisie</h1>
-          <h2 style="text-align: center; color: #1e293b; margin-bottom: 20px;">Bordereau de Mouvement de Stock</h2>
+          <div class="header-container">
+            <div class="logo-container">
+              <img src="${logoPath}" alt="Logo Société Monétique Tunisie" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="max-height: 80px; max-width: 150px; object-fit: contain;">
+              <div style="display: none; width: 150px; height: 80px; background-color: #1e293b; color: white; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; border-radius: 4px;">
+                SMT
+              </div>
+            </div>
+            <div class="header-text">
+              <h1>Société Monétique Tunisie</h1>
+              <h2>Bordereau de Mouvement de Stock</h2>
+            </div>
+          </div>
           <div class="header-info">
-            <p>Généré le ${new Date().toLocaleString("fr-FR")}</p>
-            <p>Bon de mouvement généré par : ${currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "N/A"}</p>
+            <p><strong>Généré le :</strong> ${new Date().toLocaleString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+            <p><strong>Généré par :</strong> ${currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "N/A"}</p>
           </div>
           <table>
             <tbody>
@@ -521,7 +976,8 @@ export default function MovementsManagement() {
     if (level) return Number(level.quantity) || 0
 
     // Fallback (ancien calcul): dériver des mouvements si stockLevels absent
-    const cardMovements = movements.filter((m) => m.cardId === cardId)
+    // S'assurer que movements est un tableau avant d'utiliser filter
+    const cardMovements = Array.isArray(movements) ? movements.filter((m) => m.cardId === cardId) : []
     let stock = 0
     for (const movement of cardMovements) {
       if (movement.toLocationId === locationId) stock += movement.quantity
@@ -671,7 +1127,7 @@ export default function MovementsManagement() {
         }
       }
 
-      await loadData()
+      await loadMovements()
       // Impression d'un bon consolidé si plusieurs cartes (génération en masse)
       if (bulkContext.cardQuantities.length > 1 && successCount > 0) {
         printBulkSlip(bulkContext, createdMovements)
@@ -740,6 +1196,28 @@ export default function MovementsManagement() {
 
     const w = window.open('', '_blank')
     if (!w) return
+    
+    // Formater la période pour l'affichage
+    const formatPeriod = () => {
+      if (filters.dateFrom || filters.dateTo) {
+        const dateFromStr = filters.dateFrom 
+          ? new Date(filters.dateFrom).toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' })
+          : null
+        const dateToStr = filters.dateTo 
+          ? new Date(filters.dateTo).toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric' })
+          : null
+        
+        if (dateFromStr && dateToStr) {
+          return `Du ${dateFromStr} au ${dateToStr}`
+        } else if (dateFromStr) {
+          return `À partir du ${dateFromStr}`
+        } else if (dateToStr) {
+          return `Jusqu'au ${dateToStr}`
+        }
+      }
+      return "Ensemble de la période"
+    }
+    
     const html = `
       <!DOCTYPE html>
       <html>
@@ -748,10 +1226,47 @@ export default function MovementsManagement() {
         <title>Bon de mouvement (Consolidé)</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .company-name { font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 10px; }
-          .bank-name { font-size: 24px; font-weight: bold; color: #1f2937; }
-          .date { color: #6b7280; margin-top: 10px; }
+          .header-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 15px;
+          }
+          .logo-container {
+            flex: 0 0 auto;
+            margin-right: 20px;
+          }
+          .logo-container img {
+            max-height: 80px;
+            max-width: 150px;
+            object-fit: contain;
+          }
+          .header-text {
+            flex: 1;
+            text-align: center;
+          }
+          .company-name { font-size: 20px; font-weight: bold; color: #1f2937; margin: 0 0 5px 0; }
+          .bank-name { font-size: 24px; font-weight: bold; color: #1f2937; margin: 0 0 5px 0; }
+          .date { color: #6b7280; margin: 0; }
+          .header-info {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #64748b;
+            background-color: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+          }
+          .header-info p {
+            margin: 5px 0;
+            font-size: 14px;
+          }
+          .period-info {
+            font-weight: bold;
+            color: #1e293b;
+            font-size: 15px;
+            margin: 10px 0;
+          }
           .meta-grid { margin-top: 10px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; color: #374151; }
           .meta-item { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 10px; }
           .meta-label { font-size: 12px; color: #6b7280; display: block; }
@@ -768,14 +1283,33 @@ export default function MovementsManagement() {
           .total-value { font-size: 24px; font-weight: bold; color: #059669; margin-top: 5px; }
           .footer { margin-top: 40px; text-align: center; padding: 20px; border-top: 1px solid #e5e7eb; }
           .footer-address { font-size: 12px; color: #6b7280; }
-          @media print { body { margin: 0; } }
+          @media print { 
+            body { margin: 0; }
+            .header-container {
+              page-break-inside: avoid;
+            }
+          }
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="company-name">Société Monétique Tunisie</div>
-          <div class="bank-name">${bank?.name || ''}</div>
-          <div class="date">Bon de Mouvement de Stock (Consolidé) - ${new Date().toLocaleDateString('fr-FR')}</div>
+        <div class="header-container">
+          <div class="logo-container">
+            <img src="${logoPath}" alt="Logo Société Monétique Tunisie" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="max-height: 80px; max-width: 150px; object-fit: contain;">
+            <div style="display: none; width: 150px; height: 80px; background-color: #1e293b; color: white; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; border-radius: 4px;">
+              SMT
+            </div>
+          </div>
+          <div class="header-text">
+            <div class="company-name">Société Monétique Tunisie</div>
+            <div class="bank-name">${bank?.name || ''}</div>
+            <div class="date">Bon de Mouvement de Stock (Consolidé) - ${new Date().toLocaleDateString('fr-FR')}</div>
+          </div>
+        </div>
+        
+        <div class="header-info">
+          <p><strong>Généré le :</strong> ${new Date().toLocaleString("fr-FR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+          <p><strong>Généré par :</strong> ${currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : "N/A"}</p>
+          <p class="period-info"><strong>Période :</strong> ${formatPeriod()}</p>
         </div>
 
         <div class="meta-grid">
@@ -981,53 +1515,7 @@ export default function MovementsManagement() {
     return bank ? bank.name : "N/A"
   }
 
-  // Fonction de filtrage des mouvements
-  const getFilteredMovements = () => {
-    return movements.filter((movement) => {
-      // Filtre par banque
-      if (filters.bankId && filters.bankId !== "all") {
-        const card = cards.find(c => c.id === movement.cardId)
-        if (!card || card.bankId !== filters.bankId) return false
-      }
-
-      // Filtre par carte
-      if (filters.cardId && filters.cardId !== "all" && movement.cardId !== filters.cardId) return false
-
-      // Filtre par type de mouvement
-      if (filters.movementType && filters.movementType !== "all" && movement.movementType !== filters.movementType) return false
-
-      // Filtre par date de début
-      if (filters.dateFrom) {
-        const movementDate = new Date(movement.createdAt)
-        const fromDate = new Date(filters.dateFrom)
-        if (movementDate < fromDate) return false
-      }
-
-      // Filtre par date de fin
-      if (filters.dateTo) {
-        const movementDate = new Date(movement.createdAt)
-        const toDate = new Date(filters.dateTo)
-        toDate.setHours(23, 59, 59, 999) // Inclure toute la journée
-        if (movementDate > toDate) return false
-      }
-
-      // Filtre par terme de recherche (motif)
-      if (filters.searchTerm) {
-        const searchLower = filters.searchTerm.toLowerCase()
-        const cardName = getCardName(movement.cardId).toLowerCase()
-        const reason = movement.reason.toLowerCase()
-        const userName = getUserName(movement.userId).toLowerCase()
-        
-        if (!cardName.includes(searchLower) && 
-            !reason.includes(searchLower) && 
-            !userName.includes(searchLower)) {
-          return false
-        }
-      }
-
-      return true
-    })
-  }
+  // Le filtrage est maintenant géré côté serveur via l'API
 
   // Réinitialiser les filtres
   const resetFilters = () => {
@@ -1035,11 +1523,26 @@ export default function MovementsManagement() {
       bankId: "all",
       cardId: "all",
       movementType: "all",
+      fromLocationId: "all",
+      toLocationId: "all",
       dateFrom: "",
       dateTo: "",
       searchTerm: ""
     })
+    setCurrentPage(1) // Réinitialiser à la première page
   }
+
+  // Gérer le changement de page
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    // Scroll vers le haut du tableau
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Réinitialiser à la page 1 quand les filtres changent
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filters.bankId, filters.cardId, filters.movementType, filters.fromLocationId, filters.toLocationId, filters.dateFrom, filters.dateTo, filters.searchTerm])
 
   // Obtenir les cartes filtrées par banque pour le filtre
   const getCardsForFilter = () => {
@@ -1445,7 +1948,8 @@ export default function MovementsManagement() {
           
           <CardTitle>Historique des Mouvements</CardTitle>
           <CardDescription>
-            {getFilteredMovements().length} mouvement{getFilteredMovements().length !== 1 ? "s" : ""} affiché{getFilteredMovements().length !== 1 ? "s" : ""} sur {movements.length} total
+            {movements.length} mouvement{movements.length !== 1 ? "s" : ""} affiché{movements.length !== 1 ? "s" : ""} sur {totalMovements} total
+            {totalPages > 1 && ` - Page ${currentPage} sur ${totalPages}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1502,7 +2006,18 @@ export default function MovementsManagement() {
                 <Label htmlFor="filter-type" className="text-sm">Type de mouvement</Label>
                 <Select
                   value={filters.movementType}
-                  onValueChange={(value) => setFilters({ ...filters, movementType: value })}
+                  onValueChange={(value) => {
+                    // Réinitialiser les filtres d'emplacement selon le type
+                    const newFilters: any = { ...filters, movementType: value }
+                    if (value === "entry") {
+                      // Pour "Entrée", on ne peut pas avoir d'emplacement source
+                      newFilters.fromLocationId = "all"
+                    } else if (value === "exit") {
+                      // Pour "Sortie", on ne peut pas avoir d'emplacement destination
+                      newFilters.toLocationId = "all"
+                    }
+                    setFilters(newFilters)
+                  }}
                 >
                   <SelectTrigger id="filter-type">
                     <SelectValue placeholder="Tous les types" />
@@ -1515,6 +2030,58 @@ export default function MovementsManagement() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Filtre par emplacement source (De) - Masqué pour "Entrée" */}
+              {filters.movementType !== "entry" && (
+                <div className="space-y-2">
+                  <Label htmlFor="filter-from-location" className="text-sm">Emplacement De</Label>
+                  <Select
+                    value={filters.fromLocationId}
+                    onValueChange={(value) => setFilters({ ...filters, fromLocationId: value })}
+                  >
+                    <SelectTrigger id="filter-from-location">
+                      <SelectValue placeholder="Tous les emplacements" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les emplacements</SelectItem>
+                      {(filters.bankId && filters.bankId !== "all" 
+                        ? locations.filter(l => l.bankId === filters.bankId)
+                        : locations
+                      ).map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Filtre par emplacement destination (Vers) - Masqué pour "Sortie" */}
+              {filters.movementType !== "exit" && (
+                <div className="space-y-2">
+                  <Label htmlFor="filter-to-location" className="text-sm">Emplacement Vers</Label>
+                  <Select
+                    value={filters.toLocationId}
+                    onValueChange={(value) => setFilters({ ...filters, toLocationId: value })}
+                  >
+                    <SelectTrigger id="filter-to-location">
+                      <SelectValue placeholder="Tous les emplacements" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les emplacements</SelectItem>
+                      {(filters.bankId && filters.bankId !== "all" 
+                        ? locations.filter(l => l.bankId === filters.bankId)
+                        : locations
+                      ).map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Filtre par date de début */}
               <div className="space-y-2">
@@ -1573,7 +2140,7 @@ export default function MovementsManagement() {
               <h3 className="mt-2 text-sm font-medium text-slate-900">Aucun mouvement</h3>
               <p className="mt-1 text-sm text-slate-500">Commencez par enregistrer votre premier mouvement de stock.</p>
             </div>
-          ) : getFilteredMovements().length === 0 ? (
+          ) : movements.length === 0 ? (
             <div className="text-center py-8">
               <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -1590,27 +2157,25 @@ export default function MovementsManagement() {
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Actions</TableHead>
-                    <TableHead>Date et Heure</TableHead>
-                    <TableHead>Banque</TableHead>
-                    <TableHead>Carte</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>De</TableHead>
-                    <TableHead>Vers</TableHead>
-                    <TableHead>Quantité</TableHead>
-                    <TableHead>Motif</TableHead>
-                    <TableHead>Utilisateur</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {getFilteredMovements()
-                    .slice()
-                    .reverse()
-                    .map((movement) => (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Actions</TableHead>
+                      <TableHead>Date et Heure</TableHead>
+                      <TableHead>Banque</TableHead>
+                      <TableHead>Carte</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>De</TableHead>
+                      <TableHead>Vers</TableHead>
+                      <TableHead>Quantité</TableHead>
+                      <TableHead>Motif</TableHead>
+                      <TableHead>Utilisateur</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.isArray(movements) ? movements.map((movement) => (
                       <TableRow key={movement.id}>
                         <TableCell>
                           <Button
@@ -1652,10 +2217,63 @@ export default function MovementsManagement() {
                         <TableCell className="max-w-xs truncate">{movement.reason}</TableCell>
                         <TableCell className="text-sm">{getUserName(movement.userId)}</TableCell>
                       </TableRow>
-                    ))}
+                    )) : null}
                 </TableBody>
               </Table>
             </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Affichage de {(currentPage - 1) * movementsPerPage + 1} à {Math.min(currentPage * movementsPerPage, totalMovements)} sur {totalMovements} mouvement{totalMovements !== 1 ? "s" : ""}
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                        className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                    
+                    {/* Numéros de page */}
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum
+                      if (totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i
+                      } else {
+                        pageNum = currentPage - 2 + i
+                      }
+                      
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(pageNum)}
+                            isActive={currentPage === pageNum}
+                            className="cursor-pointer"
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                    })}
+                    
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
+          </>
           )}
         </CardContent>
       </Card>

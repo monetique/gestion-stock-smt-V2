@@ -31,6 +31,7 @@ export default function LocationsManagement() {
   const [locations, setLocations] = useState<Location[]>([])
   const [banks, setBanks] = useState<Bank[]>([])
   const [cards, setCards] = useState<any[]>([])
+  const [logoPath, setLogoPath] = useState<string>('/placeholder-logo.png')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false)
@@ -58,6 +59,18 @@ export default function LocationsManagement() {
     description: "",
     bankId: "",
   })
+
+  const loadConfig = async () => {
+    try {
+      const configResponse = await fetch('/api/config')
+      const configData = await configResponse.json()
+      if (configData.success && configData.data?.general?.logo) {
+        setLogoPath(configData.data.general.logo)
+      }
+    } catch (error) {
+      console.error('Error loading config:', error)
+    }
+  }
 
   const loadData = async () => {
     setIsLoading(true)
@@ -122,6 +135,26 @@ export default function LocationsManagement() {
         <title>Stock par Banque - ${bank.name}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
+          .header-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 15px;
+          }
+          .logo-container {
+            flex: 0 0 auto;
+            margin-right: 20px;
+          }
+          .logo-container img {
+            max-height: 80px;
+            max-width: 150px;
+            object-fit: contain;
+          }
+          .header-text {
+            flex: 1;
+            text-align: center;
+          }
           .header { text-align: center; margin-bottom: 30px; }
           .company-name { font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 10px; }
           .bank-name { font-size: 24px; font-weight: bold; color: #1f2937; }
@@ -148,10 +181,18 @@ export default function LocationsManagement() {
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="company-name">Société Monétique Tunisie</div>
-          <div class="bank-name">${bank.name}</div>
-          <div class="date">Rapport de stock - ${new Date().toLocaleDateString('fr-FR')}</div>
+        <div class="header-container">
+          <div class="logo-container">
+            <img src="${logoPath}" alt="Logo Société Monétique Tunisie" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="max-height: 80px; max-width: 150px; object-fit: contain;">
+            <div style="display: none; width: 150px; height: 80px; background-color: #1e293b; color: white; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; border-radius: 4px;">
+              SMT
+            </div>
+          </div>
+          <div class="header-text">
+            <div class="company-name">Société Monétique Tunisie</div>
+            <div class="bank-name">${bank.name}</div>
+            <div class="date">Rapport de stock - ${new Date().toLocaleDateString('fr-FR')}</div>
+          </div>
         </div>
 
         ${bankLocations.map(location => {
@@ -233,6 +274,26 @@ export default function LocationsManagement() {
         <title>Stock par Emplacement - ${location.name}</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 20px; }
+          .header-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 15px;
+          }
+          .logo-container {
+            flex: 0 0 auto;
+            margin-right: 20px;
+          }
+          .logo-container img {
+            max-height: 80px;
+            max-width: 150px;
+            object-fit: contain;
+          }
+          .header-text {
+            flex: 1;
+            text-align: center;
+          }
           .header { text-align: center; margin-bottom: 30px; }
           .company-name { font-size: 20px; font-weight: bold; color: #1f2937; margin-bottom: 10px; }
           .bank-name { font-size: 20px; color: #6b7280; margin-bottom: 5px; }
@@ -253,12 +314,20 @@ export default function LocationsManagement() {
         </style>
       </head>
       <body>
-        <div class="header">
-          <div class="company-name">Société Monétique Tunisie</div>
-          <div class="bank-name">${bank?.name || 'Banque inconnue'}</div>
-          <div class="location-name">${location.name}</div>
-          <div class="location-address">${location.address || 'Adresse non renseignée'}</div>
-          <div class="date">Rapport de stock - ${new Date().toLocaleDateString('fr-FR')}</div>
+        <div class="header-container">
+          <div class="logo-container">
+            <img src="${logoPath}" alt="Logo Société Monétique Tunisie" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" style="max-height: 80px; max-width: 150px; object-fit: contain;">
+            <div style="display: none; width: 150px; height: 80px; background-color: #1e293b; color: white; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; border-radius: 4px;">
+              SMT
+            </div>
+          </div>
+          <div class="header-text">
+            <div class="company-name">Société Monétique Tunisie</div>
+            <div class="bank-name">${bank?.name || 'Banque inconnue'}</div>
+            <div class="location-name">${location.name}</div>
+            <div class="location-address">${location.address || 'Adresse non renseignée'}</div>
+            <div class="date">Rapport de stock - ${new Date().toLocaleDateString('fr-FR')}</div>
+          </div>
         </div>
 
         <table class="cards-table">
@@ -309,6 +378,7 @@ export default function LocationsManagement() {
   const isRefreshing = isSyncRefreshing || isAutoRefreshing
 
   useEffect(() => {
+    loadConfig()
     loadData()
   }, [searchFilters, searchTerm])
 
