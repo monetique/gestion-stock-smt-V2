@@ -1015,10 +1015,10 @@ export default function LocationsManagement() {
 
       {/* Modal de sélection d'impression */}
       <Dialog open={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-3xl w-full">
           <DialogHeader>
-            <DialogTitle>Impression du stock de cartes</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl">Impression du stock de cartes</DialogTitle>
+            <DialogDescription className="text-base">
               Choisissez le mode d'impression et sélectionnez l'entité à imprimer
             </DialogDescription>
           </DialogHeader>
@@ -1026,25 +1026,25 @@ export default function LocationsManagement() {
           <div className="space-y-6">
             {/* Étape 1: Sélection du mode d'impression */}
             <div>
-              <Label className="text-base font-semibold">1. Choisissez le type d'impression</Label>
-              <div className="grid grid-cols-2 gap-4 mt-3">
+              <Label className="text-lg font-semibold">1. Choisissez le type d'impression</Label>
+              <div className="grid grid-cols-2 gap-6 mt-4">
                 <Button
                   variant={printMode === "bank" ? "default" : "outline"}
                   onClick={() => handlePrintModeSelect("bank")}
-                  className="h-20 flex flex-col items-center justify-center space-y-2"
+                  className="h-32 flex flex-col items-center justify-center space-y-3 p-6"
                 >
-                  <Building2 className="h-6 w-6" />
-                  <span className="text-sm font-medium">Par Banque</span>
-                  <span className="text-xs text-gray-500">Vue globale</span>
+                  <Building2 className="h-8 w-8" />
+                  <span className="text-base font-medium">Par Banque</span>
+                  <span className="text-sm text-gray-500">Vue globale</span>
                 </Button>
                 <Button
                   variant={printMode === "location" ? "default" : "outline"}
                   onClick={() => handlePrintModeSelect("location")}
-                  className="h-20 flex flex-col items-center justify-center space-y-2"
+                  className="h-32 flex flex-col items-center justify-center space-y-3 p-6"
                 >
-                  <MapPin className="h-6 w-6" />
-                  <span className="text-sm font-medium">Par Emplacement</span>
-                  <span className="text-xs text-gray-500">Vue détaillée</span>
+                  <MapPin className="h-8 w-8" />
+                  <span className="text-base font-medium">Par Emplacement</span>
+                  <span className="text-sm text-gray-500">Vue détaillée</span>
                 </Button>
               </div>
             </div>
@@ -1052,10 +1052,10 @@ export default function LocationsManagement() {
             {/* Étape 2: Sélection de l'entité */}
             {printMode && (
               <div>
-                <Label className="text-base font-semibold">
+                <Label className="text-lg font-semibold">
                   2. Sélectionnez {printMode === "bank" ? "la banque" : "l'emplacement"}
                 </Label>
-                <div className="mt-3">
+                <div className="mt-4">
                   {printMode === "bank" ? (
                     <Select value={selectedBankId} onValueChange={setSelectedBankId}>
                       <SelectTrigger>
