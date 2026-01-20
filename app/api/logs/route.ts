@@ -26,31 +26,47 @@ export async function GET(request: NextRequest) {
     if (userId) where.userId = userId
     if (module && module !== "all") where.module = module
     if (action && action !== "all") where.action = action
-    if (status === "success") where.status = "success"
-    if (status === "failure") where.status = "failure"
+    if (status && status !== "all") {
+      if (status === "success") where.status = "success"
+      if (status === "failure") where.status = "failure"
+    }
 
+    // Filtre par terme de recherche
+    // Note: Si d'autres filtres sont présents, on combine avec AND
     if (searchTerm) {
-      where.OR = [
-        { userEmail: { contains: searchTerm, mode: 'insensitive' } },
-        { action: { contains: searchTerm, mode: 'insensitive' } },
-        { details: { contains: searchTerm, mode: 'insensitive' } },
-        { entityName: { contains: searchTerm, mode: 'insensitive' } },
-      ]
+      const searchConditions = {
+        OR: [
+          { userEmail: { contains: searchTerm, mode: 'insensitive' } },
+          { action: { contains: searchTerm, mode: 'insensitive' } },
+          { details: { contains: searchTerm, mode: 'insensitive' } },
+          { entityName: { contains: searchTerm, mode: 'insensitive' } },
+        ]
+      }
+      
+      // Si on a déjà des conditions, on doit les combiner avec AND
+      if (Object.keys(where).length > 0) {
+        const existingConditions = { ...where }
+        where.AND = [
+          existingConditions,
+          searchConditions
+        ]
+        // Supprimer les propriétés qui ont été déplacées dans AND
+        Object.keys(existingConditions).forEach(key => delete where[key])
+      } else {
+        Object.assign(where, searchConditions)
+      }
     }
 
     if (dateFrom || dateTo) {
       where.timestamp = {}
       if (dateFrom) where.timestamp.gte = new Date(dateFrom)
-      if (dateTo) where.timestamp.lte = new Date(dateTo)
-    } else {
-      // Par défaut, afficher les logs des 30 derniers jours
-      // Pour afficher tous les logs, ne pas envoyer de paramètres dateFrom/dateTo
-      const last30Days = new Date()
-      last30Days.setDate(last30Days.getDate() - 30)
-      where.timestamp = {
-        gte: last30Days
+      if (dateTo) {
+        const toDate = new Date(dateTo)
+        toDate.setHours(23, 59, 59, 999) // Inclure toute la journée
+        where.timestamp.lte = toDate
       }
     }
+    // Note: Si aucune date n'est fournie, on affiche tous les logs (pas de limite par défaut)
 
     // Récupérer les paramètres de pagination
     const limitParam = searchParams.get("limit")

@@ -65,7 +65,14 @@ export async function POST(request: NextRequest) {
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     // Validation des champs requis
     if (!body.name || !body.bankId) {
@@ -87,20 +94,18 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "create",
-        module: "locations",
-        entityType: "location",
-        entityId: newLocation.id,
-        entityName: newLocation.name,
-        details: `Création de l'emplacement ${newLocation.name}`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "create",
+      module: "locations",
+      entityType: "location",
+      entityId: newLocation.id,
+      entityName: newLocation.name,
+      details: `Création de l'emplacement ${newLocation.name}${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     return NextResponse.json<ApiResponse<Location>>(
       {

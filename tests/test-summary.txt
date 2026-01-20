@@ -1,0 +1,37 @@
+RÉSUMÉ DES TESTS DISPONIBLES
+=============================
+
+1. TESTS AUTOMATISÉS (api-tests.ts)
+   - Tests des APIs REST
+   - Couverture: Authentification, CRUD complet
+   - Exécution: ./tests/run-tests.sh ou npx tsx tests/api-tests.ts
+
+2. TESTS MANUELS (manual-tests.md)
+   - Guide complet de tous les tests à effectuer
+   - 16 catégories de tests
+   - Points critiques identifiés
+
+POINTS CRITIQUES À TESTER
+==========================
+
+✅ Filtres dans l'impression des bordereaux
+   - Statistiques doivent respecter les filtres appliqués
+   - Tester avec filtre "Emplacement De"
+   - Tester avec filtre "Date"
+   - Tester avec combinaison de filtres
+
+✅ Calcul des stocks
+   - Stock total = somme des stocks par emplacement
+   - Vérifier après chaque mouvement
+
+✅ Logs d'audit
+   - Vérifier l'enregistrement de toutes les actions
+
+✅ Emails
+   - Email de bienvenue
+   - Alertes de stock
+   - Notifications de mouvements
+
+PROCHAINE ÉTAPE
+===============
+Exécutez: ./tests/run-tests.sh

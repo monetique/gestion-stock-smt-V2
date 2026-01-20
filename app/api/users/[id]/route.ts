@@ -53,7 +53,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     // Si le mot de passe est fourni, le hasher
     const updateData: any = {}
@@ -72,20 +79,18 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       data: updateData
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "update",
-        module: "users",
-        entityType: "user",
-        entityId: updatedUser.id,
-        entityName: `${updatedUser.firstName} ${updatedUser.lastName}`,
-        details: `Modification de l'utilisateur ${updatedUser.firstName} ${updatedUser.lastName} (${updatedUser.email})`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "update",
+      module: "users",
+      entityType: "user",
+      entityId: updatedUser.id,
+      entityName: `${updatedUser.firstName} ${updatedUser.lastName}`,
+      details: `Modification de l'utilisateur ${updatedUser.firstName} ${updatedUser.lastName} (${updatedUser.email})${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     // Ne pas retourner le mot de passe
     const { password: _, ...userWithoutPassword } = updatedUser
@@ -112,7 +117,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     // Récupérer les infos avant suppression
     const user = await prisma.user.findUnique({
@@ -125,17 +137,17 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       data: { isActive: false }
     })
 
-    // Logger l'action
-    if (userData && user) {
+    // Logger l'action (toujours créer un log si l'utilisateur existe)
+    if (user) {
       await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
+        userId: userData?.id || "system",
+        userEmail: userData?.email || "system@monetique.tn",
         action: "delete",
         module: "users",
         entityType: "user",
         entityId: user.id,
         entityName: `${user.firstName} ${user.lastName}`,
-        details: `Suppression de l'utilisateur ${user.firstName} ${user.lastName} (${user.email})`,
+        details: `Suppression de l'utilisateur ${user.firstName} ${user.lastName} (${user.email})${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
         status: "success"
       }, request)
     }

@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           imported: 0,
+          created: 0,
+          updated: 0,
+          rejected: 0,
           errors: ["Format de données invalide. Un tableau est attendu."],
         },
         { status: 400 },
@@ -32,6 +35,9 @@ export async function POST(request: NextRequest) {
     const data = body.data as BankImportRow[]
     const errors: string[] = []
     let imported = 0
+    let created = 0
+    let updated = 0
+    let rejected = 0
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i]
@@ -40,6 +46,7 @@ export async function POST(request: NextRequest) {
         // Validation
         if (!row.CodeBanque || !row.NomBanque || !row.Pays || !row.SwiftCode) {
           errors.push(`Ligne ${i + 1}: Champs requis manquants`)
+          rejected++
           continue
         }
 
@@ -51,6 +58,7 @@ export async function POST(request: NextRequest) {
 
           if (!existing) {
             errors.push(`Ligne ${i + 1}: Banque avec ID ${row.ID} non trouvée`)
+            rejected++
             continue
           }
 
@@ -67,6 +75,8 @@ export async function POST(request: NextRequest) {
               email: row.Email || "",
             }
           })
+          updated++
+          imported++
         } else {
           // Vérifier si la banque existe déjà par code
           const existing = await prisma.bank.findUnique({
@@ -75,6 +85,7 @@ export async function POST(request: NextRequest) {
 
           if (existing) {
             errors.push(`Ligne ${i + 1}: Banque ${row.CodeBanque} existe déjà`)
+            rejected++
             continue
           }
 
@@ -91,11 +102,12 @@ export async function POST(request: NextRequest) {
               isActive: true,
             }
           })
+          created++
+          imported++
         }
-
-        imported++
       } catch (error) {
         errors.push(`Ligne ${i + 1}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`)
+        rejected++
       }
     }
 
@@ -116,6 +128,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json<ImportResponse>({
       success: errors.length === 0,
       imported,
+      created,
+      updated,
+      rejected,
       errors,
     })
   } catch (error) {
@@ -124,6 +139,9 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         imported: 0,
+        created: 0,
+        updated: 0,
+        rejected: 0,
         errors: ["Erreur lors de l'import des banques"],
       },
       { status: 500 },

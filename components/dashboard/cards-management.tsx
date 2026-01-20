@@ -229,7 +229,7 @@ export default function CardsManagement() {
     const card = cards.find(c => c.id === id)
     if (!card) return
 
-    const stockLevels = card.stockLevels || []
+    const stockLevels = (card as any).stockLevels || []
     const totalStock = stockLevels.reduce((sum: number, level: any) => sum + level.quantity, 0)
 
     if (totalStock > 0) {
@@ -277,7 +277,7 @@ export default function CardsManagement() {
     
     // Créer les lignes de données
     const rows = cards.map(card => {
-      const bankName = card.bank?.name || banks.find(b => b.id === card.bankId)?.name || ''
+      const bankName = (card as any).bank?.name || banks.find(b => b.id === card.bankId)?.name || ''
       return `${card.id};${bankName};${card.name};${card.type};${card.subType};${card.subSubType}`
     })
     

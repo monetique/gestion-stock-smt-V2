@@ -14,29 +14,80 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
     const cardId = searchParams.get("cardId")
-    const locationId = searchParams.get("locationId")
+    const fromLocationId = searchParams.get("fromLocationId")
+    const toLocationId = searchParams.get("toLocationId")
     const movementType = searchParams.get("type")
     const dateFrom = searchParams.get("dateFrom")
     const dateTo = searchParams.get("dateTo")
+    const bankId = searchParams.get("bankId")
+    const searchTerm = searchParams.get("searchTerm")
+    
+    // Paramètres de pagination
+    const page = parseInt(searchParams.get("page") || "1", 10)
+    const limit = parseInt(searchParams.get("limit") || "30", 10)
+    const offset = (page - 1) * limit
 
     const where: any = {}
+    let combinedConditions: any[] = []
 
-    if (cardId) where.cardId = cardId
-    if (movementType) where.movementType = movementType
+    if (cardId && cardId !== "all") combinedConditions.push({ cardId })
+    if (movementType && movementType !== "all") combinedConditions.push({ movementType })
     
-    if (locationId) {
-      where.OR = [
-        { fromLocationId: locationId },
-        { toLocationId: locationId }
-      ]
+    // Filtre par emplacement source (De)
+    if (fromLocationId && fromLocationId !== "all") {
+      combinedConditions.push({ fromLocationId })
+    }
+    
+    // Filtre par emplacement destination (Vers)
+    if (toLocationId && toLocationId !== "all") {
+      combinedConditions.push({ toLocationId })
     }
 
     if (dateFrom || dateTo) {
-      where.createdAt = {}
-      if (dateFrom) where.createdAt.gte = new Date(dateFrom)
-      if (dateTo) where.createdAt.lte = new Date(dateTo)
+      let createdAtFilter: any = {}
+      if (dateFrom) createdAtFilter.gte = new Date(dateFrom)
+      if (dateTo) {
+        const toDate = new Date(dateTo)
+        toDate.setHours(23, 59, 59, 999) // Inclure toute la journée
+        createdAtFilter.lte = toDate
+      }
+      combinedConditions.push({ createdAt: createdAtFilter })
     }
 
+    // Filtre par banque (via la carte)
+    if (bankId && bankId !== "all") {
+      combinedConditions.push({
+        card: {
+          bankId: bankId
+        }
+      })
+    }
+
+    // Filtre par terme de recherche (motif, nom de carte, nom d'utilisateur)
+    if (searchTerm) {
+      combinedConditions.push({
+        OR: [
+          { reason: { contains: searchTerm, mode: 'insensitive' } },
+          { card: { name: { contains: searchTerm, mode: 'insensitive' } } },
+          { user: {
+            OR: [
+              { firstName: { contains: searchTerm, mode: 'insensitive' } },
+              { lastName: { contains: searchTerm, mode: 'insensitive' } }
+            ]
+          } }
+        ]
+      })
+    }
+    
+    // Combiner toutes les conditions avec AND
+    if (combinedConditions.length > 0) {
+      where.AND = combinedConditions
+    }
+
+    // Compter le total avec les filtres
+    const total = await prisma.movement.count({ where })
+
+    // Récupérer les mouvements paginés
     const movements = await prisma.movement.findMany({
       where,
       include: {
@@ -56,12 +107,20 @@ export async function GET(request: NextRequest) {
         fromLocation: true,
         toLocation: true,
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      skip: offset
     })
 
-    return NextResponse.json<ApiResponse<Movement[]>>({
+    return NextResponse.json<ApiResponse<{ movements: Movement[]; total: number; page: number; limit: number; totalPages: number }>>({
       success: true,
-      data: movements as Movement[],
+      data: {
+        movements: movements as Movement[],
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      },
     })
   } catch (error) {
     console.error('Error fetching movements:', error)
@@ -80,14 +139,83 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Validation des champs requis
-    if (!body.cardId || !body.movementType || !body.quantity || !body.userId) {
+    // Récupérer l'utilisateur depuis le header
+    const userHeader = request.headers.get("x-user-data")
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
+
+    // Utiliser userId du header si disponible, sinon du body
+    const userId = userData?.id || body.userId
+
+    // Log pour déboguer
+    console.log('POST /api/movements - userId from header:', userData?.id)
+    console.log('POST /api/movements - userId from body:', body.userId)
+    console.log('POST /api/movements - final userId:', userId)
+    console.log('POST /api/movements - userHeader raw:', userHeader)
+
+          // Validation des champs requis
+          if (!body.cardId || !body.movementType || !body.quantity) {
+            return NextResponse.json<ApiResponse>(
+              {
+                success: false,
+                error: "Champs requis manquants: cardId, movementType, quantity",
+              },
+              { status: 400 },
+            )
+          }
+
+          // Validation du motif (obligatoire)
+          if (!body.reason || body.reason.trim() === "") {
+            return NextResponse.json<ApiResponse>(
+              {
+                success: false,
+                error: "Le motif est obligatoire",
+              },
+              { status: 400 },
+            )
+          }
+
+    if (!userId) {
       return NextResponse.json<ApiResponse>(
         {
           success: false,
-          error: "Champs requis manquants: cardId, movementType, quantity, userId",
+          error: "Utilisateur non identifié. Veuillez vous reconnecter.",
         },
-        { status: 400 },
+        { status: 401 },
+      )
+    }
+
+    // Vérifier que l'utilisateur existe
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      console.error(`User not found in database: ${userId}`)
+      console.error(`Available users in database:`, await prisma.user.findMany({ select: { id: true, email: true } }))
+      
+      // Si l'utilisateur n'existe pas, suggérer de vérifier l'email depuis le header
+      const userEmail = userData?.email || 'non spécifié'
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: `Utilisateur introuvable. L'ID ${userId} (${userEmail}) n'existe pas dans la base de données. Veuillez vous déconnecter et vous reconnecter.`,
+        },
+        { status: 404 },
+      )
+    }
+
+    // Vérifier que l'utilisateur est actif
+    if (!user.isActive) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Votre compte utilisateur est désactivé",
+        },
+        { status: 403 },
       )
     }
 
@@ -186,7 +314,7 @@ export async function POST(request: NextRequest) {
           movementType: body.movementType,
           quantity: body.quantity,
           reason: body.reason || "",
-          userId: body.userId,
+          userId: userId,
         },
         include: {
           card: true,
@@ -214,7 +342,7 @@ export async function POST(request: NextRequest) {
     const movementTypeLabels: Record<string, string> = { entry: "Entrée", exit: "Sortie", transfer: "Transfert" }
     const movementTypeLabel = movementTypeLabels[body.movementType] || body.movementType
     await logAudit({
-      userId: newMovement.user.id,
+      userId: userData?.id || userId,
       userEmail: newMovement.user.email,
       action: "create",
       module: "movements",
@@ -224,6 +352,58 @@ export async function POST(request: NextRequest) {
       details: `Mouvement de type ${movementTypeLabel}: ${newMovement.quantity} x ${newMovement.card.name}. Raison: ${newMovement.reason}`,
       status: "success"
     }, request)
+
+    // Envoyer notification email pour le mouvement
+    try {
+      const { sendMovementNotification } = await import("@/lib/email-service")
+      await sendMovementNotification(
+        body.movementType,
+        newMovement.card.name,
+        body.quantity,
+        newMovement.fromLocation?.name,
+        newMovement.toLocation?.name,
+        body.reason || ""
+      )
+    } catch (emailError) {
+      console.error('Erreur lors de l\'envoi de la notification email:', emailError)
+      // On continue même si l'email échoue
+    }
+
+    // Vérifier les seuils de stock après le mouvement
+    try {
+      const { sendLowStockAlert } = await import("@/lib/email-service")
+      
+      // Récupérer la carte avec ses stocks par emplacement
+      const cardWithStock = await prisma.card.findUnique({
+        where: { id: body.cardId },
+        include: {
+          bank: true,
+          stockLevels: {
+            include: {
+              location: true
+            }
+          }
+        }
+      })
+
+      if (cardWithStock) {
+        // Vérifier chaque emplacement
+        for (const stockLevel of cardWithStock.stockLevels || []) {
+          if (stockLevel.quantity < cardWithStock.minThreshold) {
+            await sendLowStockAlert(
+              cardWithStock.name,
+              stockLevel.quantity,
+              cardWithStock.minThreshold,
+              stockLevel.location?.name,
+              cardWithStock.bank?.name
+            )
+          }
+        }
+      }
+    } catch (alertError) {
+      console.error('Erreur lors de la vérification des alertes de stock:', alertError)
+      // On continue même si l'alerte échoue
+    }
 
     return NextResponse.json<ApiResponse<Movement>>(
       {

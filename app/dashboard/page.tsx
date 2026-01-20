@@ -20,6 +20,9 @@ export default function DashboardPage() {
     totalLocations: 0,
     movements: 0,
   })
+  const [topBanksWithStock, setTopBanksWithStock] = useState<Array<{ id: string; name: string; totalStock: number }>>([])
+  const [bottomBanksWithStock, setBottomBanksWithStock] = useState<Array<{ id: string; name: string; totalStock: number }>>([])
+  const [topBanksWithExits, setTopBanksWithExits] = useState<Array<{ id: string; name: string; numberOfBons: number; totalQuantity: number }>>([])
   const [recentLogs, setRecentLogs] = useState<AuditLog[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
@@ -45,6 +48,10 @@ export default function DashboardPage() {
           totalLocations: statsData.data.totalLocations,
           movements: statsData.data.todayMovements,
         })
+        // Mettre à jour les top 5 des banques
+        setTopBanksWithStock(statsData.data.topBanksWithStock || [])
+        setBottomBanksWithStock(statsData.data.bottomBanksWithStock || [])
+        setTopBanksWithExits(statsData.data.topBanksWithExits || [])
       }
 
       // Charger les logs avec filtre de date et pagination
@@ -212,6 +219,108 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Top 5 des banques par stock */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 5 des banques avec le plus de stock</CardTitle>
+            <CardDescription>Banques ayant les plus grandes quantités de cartes en stock</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {topBanksWithStock.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Aucune donnée disponible</p>
+            ) : (
+              <div className="space-y-3">
+                {topBanksWithStock.map((bank, index) => (
+                  <div key={bank.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium">{bank.name}</p>
+                        <p className="text-xs text-muted-foreground">Stock total</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-primary">{bank.totalStock.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">cartes</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 5 des banques avec le moins de stock</CardTitle>
+            <CardDescription>Banques ayant les plus petites quantités de cartes en stock</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {bottomBanksWithStock.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Aucune donnée disponible</p>
+            ) : (
+              <div className="space-y-3">
+                {bottomBanksWithStock.map((bank, index) => (
+                  <div key={bank.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-destructive text-destructive-foreground font-bold text-sm">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium">{bank.name}</p>
+                        <p className="text-xs text-muted-foreground">Stock total</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-destructive">{bank.totalStock.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">cartes</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top 5 des banques avec le plus de sorties */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Top 5 des banques avec le plus de sorties</CardTitle>
+          <CardDescription>Banques ayant effectué le plus de sorties de stock</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {topBanksWithExits.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Aucune donnée disponible</p>
+          ) : (
+            <div className="space-y-3">
+              {topBanksWithExits.map((bank, index) => (
+                <div key={bank.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/50">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-500 text-white font-bold text-sm">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-medium">{bank.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {bank.numberOfBons} {bank.numberOfBons > 1 ? 'bons' : 'bon'} de sortie
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-orange-600">{bank.totalQuantity.toLocaleString()}</p>
+                    <p className="text-xs text-muted-foreground">quantité totale</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

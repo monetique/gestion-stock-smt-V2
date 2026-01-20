@@ -1,10 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    ignoreDuringBuilds: true,
+    // Activer ESLint en production, désactiver uniquement en développement si nécessaire
+    ignoreDuringBuilds: process.env.NODE_ENV === 'production' ? false : process.env.ESLINT_DISABLE === 'true',
   },
   typescript: {
-    ignoreBuildErrors: true,
+    // Activer TypeScript en production, désactiver uniquement en développement si nécessaire
+    ignoreBuildErrors: process.env.NODE_ENV === 'production' ? false : process.env.TYPESCRIPT_DISABLE === 'true',
   },
   images: {
     unoptimized: true,

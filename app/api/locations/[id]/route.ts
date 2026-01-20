@@ -52,7 +52,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     const updatedLocation = await prisma.location.update({
       where: { id: params.id },
@@ -64,20 +71,18 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "update",
-        module: "locations",
-        entityType: "location",
-        entityId: updatedLocation.id,
-        entityName: updatedLocation.name,
-        details: `Modification de l'emplacement ${updatedLocation.name}`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "update",
+      module: "locations",
+      entityType: "location",
+      entityId: updatedLocation.id,
+      entityName: updatedLocation.name,
+      details: `Modification de l'emplacement ${updatedLocation.name}${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     return NextResponse.json<ApiResponse<Location>>({
       success: true,
@@ -101,7 +106,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     // Récupérer les infos avant suppression
     const location = await prisma.location.findUnique({
@@ -158,17 +170,17 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       where: { id: params.id }
     })
 
-    // Logger l'action
-    if (userData) {
+    // Logger l'action (toujours créer un log si l'emplacement existe)
+    if (location) {
       await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
+        userId: userData?.id || "system",
+        userEmail: userData?.email || "system@monetique.tn",
         action: "delete",
         module: "locations",
         entityType: "location",
         entityId: location.id,
         entityName: location.name,
-        details: `Suppression définitive de l'emplacement ${location.name}`,
+        details: `Suppression définitive de l'emplacement ${location.name}${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
         status: "success"
       }, request)
     }

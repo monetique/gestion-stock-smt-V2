@@ -101,7 +101,14 @@ export async function POST(request: NextRequest) {
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     const newUser = await prisma.user.create({
       data: {
@@ -114,38 +121,30 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "create",
-        module: "users",
-        entityType: "user",
-        entityId: newUser.id,
-        entityName: `${newUser.firstName} ${newUser.lastName}`,
-        details: `Création de l'utilisateur ${newUser.firstName} ${newUser.lastName} (${newUser.email}) avec le rôle ${newUser.role}`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "create",
+      module: "users",
+      entityType: "user",
+      entityId: newUser.id,
+      entityName: `${newUser.firstName} ${newUser.lastName}`,
+      details: `Création de l'utilisateur ${newUser.firstName} ${newUser.lastName} (${newUser.email}) avec le rôle ${newUser.role}${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     // Envoyer l'email si demandé
     if (body.sendEmail) {
       try {
-        // Pour l'instant, on log les informations (à remplacer par un vrai service d'email)
-        console.log(`=== EMAIL À ENVOYER ===`)
-        console.log(`À: ${body.email}`)
-        console.log(`Sujet: Informations de connexion - Plateforme Gestion de Stocks`)
-        console.log(`Contenu:`)
-        console.log(`Bonjour ${body.firstName} ${body.lastName},`)
-        console.log(`Votre compte a été créé avec succès sur la plateforme de gestion de stocks.`)
-        console.log(`Email: ${body.email}`)
-        console.log(`Mot de passe temporaire: ${plainPassword}`)
-        console.log(`Rôle: ${body.role}`)
-        console.log(`Veuillez vous connecter et changer votre mot de passe dès que possible.`)
-        console.log(`========================`)
-        
-        // TODO: Intégrer un vrai service d'email (Nodemailer, SendGrid, etc.)
+        const { sendUserWelcomeEmail } = await import("@/lib/email-service")
+        await sendUserWelcomeEmail(
+          body.email,
+          body.firstName,
+          body.lastName,
+          plainPassword,
+          body.role
+        )
       } catch (emailError) {
         console.error('Erreur lors de l\'envoi de l\'email:', emailError)
         // On continue même si l'email échoue

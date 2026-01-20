@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import type { AppConfig } from "@/lib/types"
 import { getAuthHeaders } from "@/lib/api-client"
 import { Mail, Bell, Eye, Shield, Save, Building2 } from "lucide-react"
@@ -19,6 +20,8 @@ export default function ConfigurationPanel() {
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [isTestingSmtp, setIsTestingSmtp] = useState(false)
   const [smtpTestMessage, setSmtpTestMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false)
+  const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<"welcome" | "lowStock" | "movement" | "userActivity">("welcome")
 
   useEffect(() => {
     loadConfig()
@@ -166,6 +169,216 @@ export default function ConfigurationPanel() {
     } finally {
       setIsTestingSmtp(false)
     }
+  }
+
+  // Fonctions pour générer les aperçus des templates email
+  const getWelcomeEmailPreview = () => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        </style>
+      </head>
+      <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2563eb;">Bienvenue sur la Plateforme de Gestion de Stocks</h2>
+          
+          <p>Bonjour Jean Dupont,</p>
+          
+          <p>Votre compte a été créé avec succès sur la plateforme de gestion de stocks de la Société Monétique Tunisie.</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+            <h3 style="color: #1e40af; margin-top: 0;">Vos informations de connexion :</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin: 10px 0;"><strong>Email :</strong> jean.dupont@example.com</li>
+              <li style="margin: 10px 0;"><strong>Mot de passe temporaire :</strong> <code style="background-color: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-family: monospace;">TempPass123!</code></li>
+              <li style="margin: 10px 0;"><strong>Rôle :</strong> Manager</li>
+            </ul>
+          </div>
+          
+          <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <p style="margin: 0; color: #92400e;">
+              <strong>⚠️ Important :</strong> Veuillez vous connecter et changer votre mot de passe dès que possible pour des raisons de sécurité.
+            </p>
+          </div>
+          
+          <p style="margin-top: 30px;">
+            <a href="#" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Accéder à la plateforme
+            </a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #6b7280;">
+            Cet email a été envoyé automatiquement par la plateforme de gestion de stocks.<br>
+            Si vous n'avez pas demandé ce compte, veuillez contacter l'administrateur.
+          </p>
+          
+          <p style="font-size: 12px; color: #6b7280; margin-top: 10px;">
+            Société Monétique Tunisie<br>
+            Centre urbain Nord, Sana Center, bloc C – 1082, Tunis
+          </p>
+        </div>
+      </body>
+      </html>
+    `
+  }
+
+  const getLowStockEmailPreview = () => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        </style>
+      </head>
+      <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #f59e0b; border-bottom: 3px solid #f59e0b; padding-bottom: 10px;">
+            Alerte Stock FAIBLE
+          </h2>
+          
+          <p>Bonjour,</p>
+          
+          <p>Une alerte de stock a été détectée pour la carte suivante :</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <h3 style="color: #1e40af; margin-top: 0;">Détails de l'alerte :</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin: 10px 0;"><strong>Carte :</strong> Carte Visa Classic</li>
+              <li style="margin: 10px 0;"><strong>Emplacement :</strong> Agence Centre-Ville</li>
+              <li style="margin: 10px 0;"><strong>Banque :</strong> Banque Zitouna</li>
+              <li style="margin: 10px 0;"><strong>Stock actuel :</strong> <span style="color: #f59e0b; font-weight: bold; font-size: 18px;">45</span></li>
+              <li style="margin: 10px 0;"><strong>Seuil minimum :</strong> 100</li>
+              <li style="margin: 10px 0;"><strong>Déficit :</strong> <span style="color: #f59e0b; font-weight: bold;">55 unités</span></li>
+            </ul>
+          </div>
+          
+          <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <p style="margin: 0; color: #92400e;">
+              <strong>⚠️ Attention :</strong> Le stock est en dessous du seuil minimum. Veuillez prévoir une réapprovisionnement.
+            </p>
+          </div>
+          
+          <p style="margin-top: 30px;">
+            <a href="#" style="background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Voir les cartes
+            </a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #6b7280;">
+            Cette notification a été envoyée automatiquement par la plateforme de gestion de stocks.
+          </p>
+        </div>
+      </body>
+      </html>
+    `
+  }
+
+  const getMovementEmailPreview = () => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        </style>
+      </head>
+      <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #3b82f6; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;">
+            Mouvement de Stock : Transfert
+          </h2>
+          
+          <p>Bonjour,</p>
+          
+          <p>Un nouveau mouvement de stock a été enregistré :</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+            <h3 style="color: #1e40af; margin-top: 0;">Détails du mouvement :</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin: 10px 0;"><strong>Type :</strong> <span style="color: #3b82f6; font-weight: bold;">Transfert</span></li>
+              <li style="margin: 10px 0;"><strong>Carte :</strong> Carte Mastercard Gold</li>
+              <li style="margin: 10px 0;"><strong>Quantité :</strong> <span style="font-weight: bold; font-size: 18px;">250</span> unités</li>
+              <li style="margin: 10px 0;"><strong>De :</strong> Agence Centre-Ville</li>
+              <li style="margin: 10px 0;"><strong>Vers :</strong> Agence Banlieue Nord</li>
+              <li style="margin: 10px 0;"><strong>Motif :</strong> Réapprovisionnement</li>
+              <li style="margin: 10px 0;"><strong>Date :</strong> ${new Date().toLocaleString("fr-FR")}</li>
+            </ul>
+          </div>
+          
+          <p style="margin-top: 30px;">
+            <a href="#" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Voir les mouvements
+            </a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #6b7280;">
+            Cette notification a été envoyée automatiquement par la plateforme de gestion de stocks.
+          </p>
+        </div>
+      </body>
+      </html>
+    `
+  }
+
+  const getUserActivityEmailPreview = () => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
+        </style>
+      </head>
+      <body>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #6366f1; border-bottom: 3px solid #6366f1; padding-bottom: 10px;">
+            Activité Utilisateur
+          </h2>
+          
+          <p>Bonjour,</p>
+          
+          <p>Une activité utilisateur importante a été détectée :</p>
+          
+          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #6366f1;">
+            <h3 style="color: #1e40af; margin-top: 0;">Détails de l'activité :</h3>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin: 10px 0;"><strong>Type d'activité :</strong> Création d'utilisateur</li>
+              <li style="margin: 10px 0;"><strong>Utilisateur :</strong> Marie Martin</li>
+              <li style="margin: 10px 0;"><strong>Email :</strong> marie.martin@example.com</li>
+              <li style="margin: 10px 0;"><strong>Détails :</strong> Nouvel utilisateur créé avec le rôle "Operator"</li>
+              <li style="margin: 10px 0;"><strong>Date :</strong> ${new Date().toLocaleString("fr-FR")}</li>
+            </ul>
+          </div>
+          
+          <p style="margin-top: 30px;">
+            <a href="#" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Voir les logs
+            </a>
+          </p>
+          
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+          
+          <p style="font-size: 12px; color: #6b7280;">
+            Cette notification a été envoyée automatiquement par la plateforme de gestion de stocks.
+          </p>
+        </div>
+      </body>
+      </html>
+    `
   }
 
   if (!config) {
@@ -671,6 +884,78 @@ export default function ConfigurationPanel() {
                   }
                 />
                 <p className="text-sm text-slate-500">Séparez les emails par des virgules</p>
+              </div>
+
+              <Separator />
+
+              {/* Aperçu des templates email */}
+              <div className="space-y-2">
+                <Label>Aperçu des templates email</Label>
+                <p className="text-sm text-slate-500 mb-4">
+                  Visualisez l'apparence des emails envoyés aux utilisateurs
+                </p>
+                <Dialog open={emailPreviewOpen} onOpenChange={setEmailPreviewOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" className="w-full gap-2">
+                      <Eye className="h-4 w-4" />
+                      Voir l'aperçu des templates email
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>Aperçu des templates email</DialogTitle>
+                      <DialogDescription>
+                        Visualisez l'apparence des emails qui seront envoyés aux utilisateurs
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 min-h-0 flex flex-col space-y-4">
+                      <Tabs value={selectedEmailTemplate} onValueChange={(v) => setSelectedEmailTemplate(v as any)}>
+                        <TabsList className="grid w-full grid-cols-4">
+                          <TabsTrigger value="welcome">Bienvenue</TabsTrigger>
+                          <TabsTrigger value="lowStock">Stock bas</TabsTrigger>
+                          <TabsTrigger value="movement">Mouvement</TabsTrigger>
+                          <TabsTrigger value="userActivity">Activité</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="welcome" className="flex-1 min-h-0 mt-4">
+                          <div className="border rounded-lg overflow-hidden bg-white h-full">
+                            <iframe
+                              srcDoc={getWelcomeEmailPreview()}
+                              className="w-full h-full min-h-[500px] border-0"
+                              title="Aperçu email de bienvenue"
+                            />
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="lowStock" className="flex-1 min-h-0 mt-4">
+                          <div className="border rounded-lg overflow-hidden bg-white h-full">
+                            <iframe
+                              srcDoc={getLowStockEmailPreview()}
+                              className="w-full h-full min-h-[500px] border-0"
+                              title="Aperçu email alerte stock bas"
+                            />
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="movement" className="flex-1 min-h-0 mt-4">
+                          <div className="border rounded-lg overflow-hidden bg-white h-full">
+                            <iframe
+                              srcDoc={getMovementEmailPreview()}
+                              className="w-full h-full min-h-[500px] border-0"
+                              title="Aperçu email notification mouvement"
+                            />
+                          </div>
+                        </TabsContent>
+                        <TabsContent value="userActivity" className="flex-1 min-h-0 mt-4">
+                          <div className="border rounded-lg overflow-hidden bg-white h-full">
+                            <iframe
+                              srcDoc={getUserActivityEmailPreview()}
+                              className="w-full h-full min-h-[500px] border-0"
+                              title="Aperçu email alerte activité utilisateur"
+                            />
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardContent>
           </Card>

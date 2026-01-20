@@ -86,7 +86,14 @@ export async function POST(request: NextRequest) {
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     // Validation des champs requis
     if (!body.name || !body.type || !body.subType || !body.subSubType || !body.bankId) {
@@ -136,20 +143,18 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "create",
-        module: "cards",
-        entityType: "card",
-        entityId: newCard.id,
-        entityName: newCard.name,
-        details: `Création de la carte ${newCard.name} (${newCard.type} - ${newCard.subType})`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "create",
+      module: "cards",
+      entityType: "card",
+      entityId: newCard.id,
+      entityName: newCard.name,
+      details: `Création de la carte ${newCard.name} (${newCard.type} - ${newCard.subType})${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     return NextResponse.json<ApiResponse<Card>>(
       {

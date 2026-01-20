@@ -23,6 +23,9 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           imported: 0,
+          created: 0,
+          updated: 0,
+          rejected: 0,
           errors: ["Format de données invalide. Un tableau est attendu."],
         },
         { status: 400 },
@@ -129,6 +132,9 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         imported: 0,
+        created: 0,
+        updated: 0,
+        rejected: 0,
         errors: ["Erreur lors de l'import des emplacements"],
       },
       { status: 500 },

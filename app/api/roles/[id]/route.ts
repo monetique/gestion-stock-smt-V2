@@ -17,7 +17,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     const role = await prisma.rolePermission.findUnique({
       where: { id: params.id }
@@ -54,20 +61,18 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "update",
-        module: "roles",
-        entityType: "role",
-        entityId: updatedRole.id,
-        entityName: updatedRole.role,
-        details: `Modification du rôle ${updatedRole.role}`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "update",
+      module: "roles",
+      entityType: "role",
+      entityId: updatedRole.id,
+      entityName: updatedRole.role,
+      details: `Modification du rôle ${updatedRole.role}${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     // Émettre l'événement de synchronisation
     eventBus.emit("role:updated", { roleId: params.id, role: updatedRole.role })
@@ -94,7 +99,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     const role = await prisma.rolePermission.findUnique({
       where: { id: params.id }
@@ -125,17 +137,17 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       where: { id: params.id }
     })
 
-    // Logger l'action
-    if (userData) {
+    // Logger l'action (toujours créer un log si le rôle existe)
+    if (role) {
       await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
+        userId: userData?.id || "system",
+        userEmail: userData?.email || "system@monetique.tn",
         action: "delete",
         module: "roles",
         entityType: "role",
         entityId: role.id,
         entityName: role.role,
-        details: `Suppression du rôle ${role.role}`,
+        details: `Suppression du rôle ${role.role}${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
         status: "success"
       }, request)
     }

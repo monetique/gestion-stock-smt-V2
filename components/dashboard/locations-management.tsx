@@ -51,6 +51,7 @@ export default function LocationsManagement() {
   } | null>(null)
   const [viewMode, setViewMode] = useState<"list" | "grouped">("grouped")
   const [isLoading, setIsLoading] = useState(true)
+  const [importErrors, setImportErrors] = useState<string[]>([])
 
   const [searchFilters, setSearchFilters] = useState<LocationFilters>({})
   const [searchTerm, setSearchTerm] = useState("")
@@ -175,9 +176,62 @@ export default function LocationsManagement() {
           .total { margin-top: 30px; padding: 20px; background-color: #f3f4f6; border-radius: 8px; text-align: center; }
           .total-label { font-size: 18px; color: #374151; }
           .total-value { font-size: 24px; font-weight: bold; color: #059669; margin-top: 5px; }
-          .footer { margin-top: 40px; text-align: center; padding: 20px; border-top: 1px solid #e5e7eb; }
-          .footer-address { font-size: 12px; color: #6b7280; }
-          @media print { body { margin: 0; } }
+          .signatures { 
+            display: flex; 
+            justify-content: space-around; 
+            margin-top: 60px; 
+            margin-bottom: 20px; 
+            padding-top: 40px;
+            border-top: 1px solid #e5e7eb;
+          }
+          .signature { 
+            flex: 1; 
+            text-align: center; 
+            padding: 0 20px;
+          }
+          .signature-line { 
+            border-top: 1px solid #d1d5db; 
+            margin-top: 60px; 
+            width: 100%;
+          }
+          .signature-label { 
+            margin-top: 8px; 
+            color: #9ca3af; 
+            font-size: 11px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .footer { 
+            margin-top: 20px; 
+            padding: 15px 20px; 
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #9ca3af;
+          }
+          .footer-address { flex: 1; }
+          .footer-page { flex: 0 0 auto; }
+          @media print { 
+            body { 
+              margin: 0; 
+              padding-bottom: 120px;
+            }
+            .footer { 
+              position: fixed; 
+              bottom: 0; 
+              left: 0; 
+              right: 0; 
+              width: 100%; 
+              margin: 0;
+              background-color: #f3f4f6;
+              z-index: 1000;
+            }
+            .signatures {
+              page-break-inside: avoid;
+            }
+          }
         </style>
       </head>
       <body>
@@ -202,7 +256,6 @@ export default function LocationsManagement() {
           return `
             <div class="location">
               <div class="location-name">${location.name}</div>
-              <div class="location-address">${location.address || 'Adresse non renseignée'}</div>
               <div class="location-description">${location.description || 'Aucune description'}</div>
               
               ${locationCards.length > 0 ? `
@@ -243,8 +296,24 @@ export default function LocationsManagement() {
           <div class="total-value">${totalCards} cartes</div>
         </div>
         
+        <div class="signatures">
+          <div class="signature">
+            <div class="signature-line"></div>
+            <div class="signature-label">Signature 1</div>
+          </div>
+          <div class="signature">
+            <div class="signature-line"></div>
+            <div class="signature-label">Signature 2</div>
+          </div>
+          <div class="signature">
+            <div class="signature-line"></div>
+            <div class="signature-label">Signature 3</div>
+          </div>
+        </div>
+        
         <div class="footer">
           <div class="footer-address">Centre urbain Nord, Sana Center, bloc C – 1082, Tunis</div>
+          <div class="footer-page">Page 1/1</div>
         </div>
       </body>
       </html>
@@ -308,9 +377,62 @@ export default function LocationsManagement() {
           .total { margin-top: 30px; padding: 20px; background-color: #f3f4f6; border-radius: 8px; text-align: center; }
           .total-label { font-size: 18px; color: #374151; }
           .total-value { font-size: 24px; font-weight: bold; color: #059669; margin-top: 5px; }
-          .footer { margin-top: 40px; text-align: center; padding: 20px; border-top: 1px solid #e5e7eb; }
-          .footer-address { font-size: 12px; color: #6b7280; }
-          @media print { body { margin: 0; } }
+          .signatures { 
+            display: flex; 
+            justify-content: space-around; 
+            margin-top: 60px; 
+            margin-bottom: 20px; 
+            padding-top: 40px;
+            border-top: 1px solid #e5e7eb;
+          }
+          .signature { 
+            flex: 1; 
+            text-align: center; 
+            padding: 0 20px;
+          }
+          .signature-line { 
+            border-top: 1px solid #d1d5db; 
+            margin-top: 60px; 
+            width: 100%;
+          }
+          .signature-label { 
+            margin-top: 8px; 
+            color: #9ca3af; 
+            font-size: 11px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .footer { 
+            margin-top: 20px; 
+            padding: 15px 20px; 
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: #9ca3af;
+          }
+          .footer-address { flex: 1; }
+          .footer-page { flex: 0 0 auto; }
+          @media print { 
+            body { 
+              margin: 0; 
+              padding-bottom: 120px;
+            }
+            .footer { 
+              position: fixed; 
+              bottom: 0; 
+              left: 0; 
+              right: 0; 
+              width: 100%; 
+              margin: 0;
+              background-color: #f3f4f6;
+              z-index: 1000;
+            }
+            .signatures {
+              page-break-inside: avoid;
+            }
+          }
         </style>
       </head>
       <body>
@@ -325,7 +447,6 @@ export default function LocationsManagement() {
             <div class="company-name">Société Monétique Tunisie</div>
             <div class="bank-name">${bank?.name || 'Banque inconnue'}</div>
             <div class="location-name">${location.name}</div>
-            <div class="location-address">${location.address || 'Adresse non renseignée'}</div>
             <div class="date">Rapport de stock - ${new Date().toLocaleDateString('fr-FR')}</div>
           </div>
         </div>
@@ -357,8 +478,24 @@ export default function LocationsManagement() {
           <div class="total-value">${locationCards.reduce((sum, item) => sum + item.quantity, 0)} cartes</div>
         </div>
         
+        <div class="signatures">
+          <div class="signature">
+            <div class="signature-line"></div>
+            <div class="signature-label">Signature 1</div>
+          </div>
+          <div class="signature">
+            <div class="signature-line"></div>
+            <div class="signature-label">Signature 2</div>
+          </div>
+          <div class="signature">
+            <div class="signature-line"></div>
+            <div class="signature-label">Signature 3</div>
+          </div>
+        </div>
+        
         <div class="footer">
           <div class="footer-address">Centre urbain Nord, Sana Center, bloc C – 1082, Tunis</div>
+          <div class="footer-page">Page 1/1</div>
         </div>
       </body>
       </html>

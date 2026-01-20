@@ -40,7 +40,14 @@ export async function POST(request: NextRequest) {
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     if (!body.role || !body.permissions) {
       return NextResponse.json<ApiResponse>(
@@ -61,20 +68,18 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "create",
-        module: "roles",
-        entityType: "role",
-        entityId: newRole.id,
-        entityName: newRole.role,
-        details: `Création du rôle ${newRole.role} avec ${Array.isArray(newRole.permissions) ? newRole.permissions.length : 0} permission(s)`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "create",
+      module: "roles",
+      entityType: "role",
+      entityId: newRole.id,
+      entityName: newRole.role,
+      details: `Création du rôle ${newRole.role} avec ${Array.isArray(newRole.permissions) ? newRole.permissions.length : 0} permission(s)${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     // Émettre l'événement de synchronisation
     eventBus.emit("role:created", { roleId: newRole.id, role: newRole.role })

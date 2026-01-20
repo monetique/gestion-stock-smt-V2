@@ -4,12 +4,67 @@ import type { ApiResponse } from "@/lib/api-types"
 import type { Bank } from "@/lib/types"
 import { logAudit } from "@/lib/audit-logger"
 
+// GET /api/banks/[id] - Récupérer une banque spécifique
 // PUT /api/banks/[id] - Mettre à jour une banque
+// DELETE /api/banks/[id] - Supprimer une banque
 
 // Forcer la route à être dynamique (ne pas pré-rendre)
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params
+
+    const bank = await prisma.bank.findUnique({
+      where: { id },
+      include: {
+        cards: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          }
+        },
+        locations: {
+          select: {
+            id: true,
+            name: true,
+          }
+        }
+      }
+    })
+
+    if (!bank) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Banque non trouvée",
+        },
+        { status: 404 },
+      )
+    }
+
+    return NextResponse.json<ApiResponse<Bank>>({
+      success: true,
+      data: bank as Bank,
+    })
+  } catch (error) {
+    console.error('Error fetching bank:', error)
+    return NextResponse.json<ApiResponse>(
+      {
+        success: false,
+        error: "Erreur lors de la récupération de la banque",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+// PUT /api/banks/[id] - Mettre à jour une banque
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -20,7 +75,14 @@ export async function PUT(
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     const updatedBank = await prisma.bank.update({
       where: { id },
@@ -36,20 +98,18 @@ export async function PUT(
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "update",
-        module: "banks",
-        entityType: "bank",
-        entityId: updatedBank.id,
-        entityName: updatedBank.name,
-        details: `Modification de la banque ${updatedBank.name} (${updatedBank.code})`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "update",
+      module: "banks",
+      entityType: "bank",
+      entityId: updatedBank.id,
+      entityName: updatedBank.name,
+      details: `Modification de la banque ${updatedBank.name} (${updatedBank.code})${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     return NextResponse.json<ApiResponse<Bank>>({
       success: true,
@@ -78,7 +138,14 @@ export async function DELETE(
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     // Récupérer les infos de la banque avant suppression
     const bank = await prisma.bank.findUnique({
@@ -89,17 +156,17 @@ export async function DELETE(
       where: { id }
     })
 
-    // Logger l'action
-    if (userData && bank) {
+    // Logger l'action (toujours créer un log si la banque existe)
+    if (bank) {
       await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
+        userId: userData?.id || "system",
+        userEmail: userData?.email || "system@monetique.tn",
         action: "delete",
         module: "banks",
         entityType: "bank",
         entityId: id,
         entityName: bank.name,
-        details: `Suppression de la banque ${bank.name} (${bank.code})`,
+        details: `Suppression de la banque ${bank.name} (${bank.code})${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
         status: "success"
       }, request)
     }

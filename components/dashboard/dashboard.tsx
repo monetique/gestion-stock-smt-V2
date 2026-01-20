@@ -21,7 +21,22 @@ interface DashboardProps {
 
 export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [activeTab, setActiveTab] = useState("overview")
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{
+    totalBanks: number
+    totalCardTypes: number
+    totalLocations: number
+    todayMovements: number
+    totalCards: number
+    lowStockCards: number
+    activeUsers: number
+    totalStockVolume: number
+    avgEntryPerDay: number
+    avgExitPerDay: number
+    avgTransferPerDay: number
+    topBanksWithStock: Array<{ id: string; name: string; totalStock: number }>
+    bottomBanksWithStock: Array<{ id: string; name: string; totalStock: number }>
+    banksInMinStock: Array<{ id: string; name: string; lowStockCards: Array<{ name: string; stock: number; threshold: number }> }>
+  }>({
     totalBanks: 0,
     totalCardTypes: 0,
     totalLocations: 0,
@@ -354,13 +369,13 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                           <Badge variant="destructive">Stock Minimum</Badge>
                         </div>
                         <div className="space-y-2">
-                          {bank.lowStockCards.map((card, index) => (
+                          {bank.lowStockCards.map((card: { name: string; stock: number; threshold: number }, index: number) => (
                             <div key={index} className="flex items-center justify-between text-sm">
                               <span className="text-red-700">{card.name}</span>
                               <div className="flex items-center space-x-2">
-                                <span className="text-red-600 font-medium">{card.quantity}</span>
+                                <span className="text-red-600 font-medium">{card.stock}</span>
                                 <span className="text-muted-foreground">/</span>
-                                <span className="text-muted-foreground">{card.minThreshold}</span>
+                                <span className="text-muted-foreground">{card.threshold}</span>
                               </div>
                             </div>
                           ))}

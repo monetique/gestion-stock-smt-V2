@@ -52,7 +52,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     const updatedCard = await prisma.card.update({
       where: { id: params.id },
@@ -69,20 +76,18 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       }
     })
 
-    // Logger l'action
-    if (userData) {
-      await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
-        action: "update",
-        module: "cards",
-        entityType: "card",
-        entityId: updatedCard.id,
-        entityName: updatedCard.name,
-        details: `Modification de la carte ${updatedCard.name} (${updatedCard.type})`,
-        status: "success"
-      }, request)
-    }
+    // Logger l'action (toujours créer un log)
+    await logAudit({
+      userId: userData?.id || "system",
+      userEmail: userData?.email || "system@monetique.tn",
+      action: "update",
+      module: "cards",
+      entityType: "card",
+      entityId: updatedCard.id,
+      entityName: updatedCard.name,
+      details: `Modification de la carte ${updatedCard.name} (${updatedCard.type})${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
+      status: "success"
+    }, request)
 
     return NextResponse.json<ApiResponse<Card>>({
       success: true,
@@ -106,7 +111,14 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   try {
     // Récupérer l'utilisateur depuis le header
     const userHeader = request.headers.get("x-user-data")
-    const userData = userHeader ? JSON.parse(userHeader) : null
+    let userData = null
+    try {
+      if (userHeader) {
+        userData = JSON.parse(userHeader)
+      }
+    } catch (error) {
+      console.error('Error parsing user header:', error)
+    }
 
     // Vérifier si la carte existe
     const card = await prisma.card.findUnique({
@@ -146,17 +158,17 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       data: { isActive: false }
     })
 
-    // Logger l'action
-    if (userData) {
+    // Logger l'action (toujours créer un log si la carte existe)
+    if (card) {
       await logAudit({
-        userId: userData.id,
-        userEmail: userData.email,
+        userId: userData?.id || "system",
+        userEmail: userData?.email || "system@monetique.tn",
         action: "delete",
         module: "cards",
         entityType: "card",
         entityId: card.id,
         entityName: card.name,
-        details: `Suppression de la carte ${card.name} (${card.type})`,
+        details: `Suppression de la carte ${card.name} (${card.type})${userData ? ` par ${userData.email}` : ' (utilisateur non identifié)'}`,
         status: "success"
       }, request)
     }

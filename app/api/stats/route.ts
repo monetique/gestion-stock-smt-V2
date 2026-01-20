@@ -115,51 +115,100 @@ export async function GET(request: NextRequest) {
     const avgExitPerDay = exitMovements.length / 30
     const avgTransferPerDay = transferMovements.length / 30
 
-    // Top 3 des banques avec le plus de stock
-    const banksWithMostStock = await prisma.bank.findMany({
-      where: { isActive: true },
-      include: {
-        cards: {
-          where: { isActive: true },
-          select: { quantity: true }
+    // Top 5 des banques avec le plus de stock
+    // Si un filtre de date est appliqué, calculer le stock à la date de fin (ou aujourd'hui si pas de date de fin)
+    // en ajustant le stock actuel avec les mouvements après cette date
+    let banksWithStockCalculated: Array<{ id: string; name: string; totalStock: number }> = []
+    
+    // Déterminer la date de fin pour le calcul du stock
+    const stockCalculationDate = dateTo ? new Date(dateTo) : (dateFrom ? new Date() : null)
+    
+    if (hasDateFilter && stockCalculationDate) {
+      // Récupérer toutes les banques avec leurs cartes
+      const allBanks = await prisma.bank.findMany({
+        where: { isActive: true },
+        include: {
+          cards: {
+            where: { isActive: true },
+            select: { 
+              id: true,
+              quantity: true 
+            }
+          }
         }
-      },
-      orderBy: {
-        cards: {
-          _count: 'desc'
-        }
-      },
-      take: 3
-    })
+      })
 
-    const topBanksWithStock = banksWithMostStock.map(bank => ({
-      id: bank.id,
-      name: bank.name,
-      totalStock: bank.cards.reduce((sum, card) => sum + card.quantity, 0)
-    }))
-
-    // Top 3 des banques avec le moins de stock
-    const banksWithLeastStock = await prisma.bank.findMany({
-      where: { isActive: true },
-      include: {
-        cards: {
-          where: { isActive: true },
-          select: { quantity: true }
+      // Pour chaque banque, calculer le stock à la date de fin
+      banksWithStockCalculated = await Promise.all(allBanks.map(async (bank) => {
+        let totalStock = 0
+        
+        for (const card of bank.cards) {
+          // Partir du stock actuel
+          let cardStock = card.quantity
+          
+          // Récupérer tous les mouvements de cette carte après la date de calcul
+          const movementsAfterDate = await prisma.movement.findMany({
+            where: {
+              cardId: card.id,
+              createdAt: {
+                gt: stockCalculationDate
+              }
+            },
+            select: {
+              movementType: true,
+              quantity: true
+            }
+          })
+          
+          // Ajuster le stock en retirant les mouvements après la date
+          // Si c'est une entrée après la date, on la retire du stock
+          // Si c'est une sortie après la date, on l'ajoute au stock (car elle n'avait pas encore eu lieu)
+          movementsAfterDate.forEach(m => {
+            if (m.movementType === 'entry') {
+              cardStock -= m.quantity
+            } else if (m.movementType === 'exit') {
+              cardStock += m.quantity
+            }
+            // Pour les transferts, on ne les compte pas car ils ne changent pas le stock total
+          })
+          
+          totalStock += Math.max(0, cardStock)
         }
-      },
-      orderBy: {
-        cards: {
-          _count: 'asc'
+        
+        return {
+          id: bank.id,
+          name: bank.name,
+          totalStock
         }
-      },
-      take: 3
-    })
+      }))
+    } else {
+      // Utiliser le stock actuel des cartes
+      const allBanksWithStock = await prisma.bank.findMany({
+        where: { isActive: true },
+        include: {
+          cards: {
+            where: { isActive: true },
+            select: { quantity: true }
+          }
+        }
+      })
 
-    const bottomBanksWithStock = banksWithLeastStock.map(bank => ({
-      id: bank.id,
-      name: bank.name,
-      totalStock: bank.cards.reduce((sum, card) => sum + card.quantity, 0)
-    }))
+      banksWithStockCalculated = allBanksWithStock.map(bank => ({
+        id: bank.id,
+        name: bank.name,
+        totalStock: bank.cards.reduce((sum, card) => sum + card.quantity, 0)
+      }))
+    }
+
+    // Trier par stock total décroissant et prendre le top 5
+    const topBanksWithStock = banksWithStockCalculated
+      .sort((a, b) => b.totalStock - a.totalStock)
+      .slice(0, 5)
+
+    // Trier par stock total croissant et prendre le top 5 (moins de stock)
+    const bottomBanksWithStock = banksWithStockCalculated
+      .sort((a, b) => a.totalStock - b.totalStock)
+      .slice(0, 5)
 
     // Banques en stock minimum (quantité < seuil minimum)
     const banksWithLowStock = await prisma.bank.findMany({
@@ -184,6 +233,59 @@ export async function GET(request: NextRequest) {
       }))
       .filter(bank => bank.lowStockCards.length > 0)
 
+    // Top 5 des banques avec le plus de sorties
+    // Récupérer les mouvements de type "exit" avec filtre de date si applicable
+    const exitMovementsWhere: any = {
+      movementType: 'exit'
+    }
+    
+    // Appliquer le filtre de date si présent
+    if (hasDateFilter) {
+      exitMovementsWhere.createdAt = dateFilter
+    }
+    
+    const allExitMovements = await prisma.movement.findMany({
+      where: exitMovementsWhere,
+      include: {
+        card: {
+          include: {
+            bank: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    })
+
+    // Grouper par banque et calculer le nombre de bons et la quantité totale
+    const bankExitsMap = new Map<string, { id: string; name: string; numberOfBons: number; totalQuantity: number }>()
+    
+    allExitMovements.forEach(movement => {
+      const bankId = movement.card.bank.id
+      const bankName = movement.card.bank.name
+      
+      if (!bankExitsMap.has(bankId)) {
+        bankExitsMap.set(bankId, {
+          id: bankId,
+          name: bankName,
+          numberOfBons: 0,
+          totalQuantity: 0
+        })
+      }
+      
+      const bankData = bankExitsMap.get(bankId)!
+      bankData.numberOfBons += 1
+      bankData.totalQuantity += movement.quantity
+    })
+
+    // Convertir en tableau, trier par quantité totale décroissante et prendre le top 5
+    const topBanksWithExits = Array.from(bankExitsMap.values())
+      .sort((a, b) => b.totalQuantity - a.totalQuantity)
+      .slice(0, 5)
+
     const stats = {
       totalBanks,
       totalCardTypes,
@@ -199,7 +301,8 @@ export async function GET(request: NextRequest) {
       avgTransferPerDay: Math.round(avgTransferPerDay * 100) / 100,
       topBanksWithStock,
       bottomBanksWithStock,
-      banksInMinStock
+      banksInMinStock,
+      topBanksWithExits
     }
 
     return NextResponse.json<ApiResponse>({

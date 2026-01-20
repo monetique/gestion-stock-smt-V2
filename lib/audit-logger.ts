@@ -45,6 +45,30 @@ export async function logAudit(
         errorMessage: entry.errorMessage || null,
       },
     })
+
+    // Envoyer notification email pour les activités importantes
+    if (entry.status === "success") {
+      const importantActions = ["delete", "create"]
+      const importantModules = ["users", "config", "roles"]
+      
+      if (importantActions.includes(entry.action) && importantModules.includes(entry.module)) {
+        try {
+          const { sendUserActivityAlert } = await import("@/lib/email-service")
+          const activityType = `${entry.action.charAt(0).toUpperCase() + entry.action.slice(1)} ${entry.module}`
+          const userName = entry.userEmail.split("@")[0] // Utiliser l'email comme nom si pas disponible
+          
+          await sendUserActivityAlert(
+            activityType,
+            userName,
+            entry.userEmail,
+            entry.details
+          )
+        } catch (emailError) {
+          console.error("Erreur lors de l'envoi de l'alerte email:", emailError)
+          // On continue même si l'email échoue
+        }
+      }
+    }
   } catch (error) {
     // En cas d'erreur de logging, on ne bloque pas l'opération principale
     console.error("Error logging audit entry:", error)

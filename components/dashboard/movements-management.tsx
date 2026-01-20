@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useDataSync, useAutoRefresh } from "@/hooks/use-data-sync"
 import type { Movement, Card as CardType, Location, Bank } from "@/lib/types"
 import { Filter, ChevronLeft, ChevronRight } from "lucide-react"
@@ -51,10 +52,16 @@ export default function MovementsManagement() {
     reason: "",
   })
 
+  const [movementErrors, setMovementErrors] = useState<Array<{
+    cardName: string
+    error: string
+  }>>([])
+
   const [formErrors, setFormErrors] = useState<{
     quantity?: string
     fromLocationId?: string
     toLocationId?: string
+    reason?: string
   }>({})
   const [isGeneratingBulk, setIsGeneratingBulk] = useState(false)
 
@@ -995,6 +1002,7 @@ export default function MovementsManagement() {
       quantity?: string
       fromLocationId?: string
       toLocationId?: string
+      reason?: string
     } = {}
 
     // Validate bankId
@@ -1044,6 +1052,11 @@ export default function MovementsManagement() {
         errors.fromLocationId = "L'emplacement source et destination doivent être différents"
         errors.toLocationId = "L'emplacement source et destination doivent être différents"
       }
+    }
+
+    // Validate reason (motif) is required
+    if (!formData.reason || formData.reason.trim() === "") {
+      errors.reason = "Le motif est obligatoire"
     }
 
     // Validate available stock for exit and transfer
@@ -1099,13 +1112,17 @@ export default function MovementsManagement() {
       let successCount = 0
       let errorCount = 0
       const createdMovements: Movement[] = [] as any
+      const errors: Array<{ cardName: string; error: string }> = []
+
+      // Réinitialiser les erreurs avant de commencer
+      setMovementErrors([])
 
       for (const cardQuantity of formData.cardQuantities) {
         const movementData = {
           ...formData,
           cardId: cardQuantity.cardId,
           quantity: cardQuantity.quantity, // Quantité spécifique à cette carte
-          userId: currentUser?.id || '',
+          // userId sera récupéré depuis l'en-tête x-user-data
           fromLocationId: formData.movementType === "entry" ? null : formData.fromLocationId || null,
           toLocationId: formData.movementType === "exit" ? null : formData.toLocationId || null,
         }
@@ -1123,24 +1140,40 @@ export default function MovementsManagement() {
         } else {
           errorCount++
           const card = cards.find(c => c.id === cardQuantity.cardId)
-          console.error(`Erreur pour la carte ${card?.name}:`, data.error)
+          const cardName = card?.name || "Carte inconnue"
+          const errorMessage = data.error || "Erreur inconnue"
+          errors.push({ cardName, error: errorMessage })
+          console.error(`Erreur pour la carte ${cardName}:`, errorMessage)
         }
       }
 
+      // Afficher les erreurs dans le modal
+      if (errors.length > 0) {
+        setMovementErrors(errors)
+      }
+
       await loadMovements()
-      // Impression d'un bon consolidé si plusieurs cartes (génération en masse)
-      if (bulkContext.cardQuantities.length > 1 && successCount > 0) {
+      
+      // Impression d'un bon consolidé si plusieurs cartes (génération en masse) et que tous sont réussis
+      if (bulkContext.cardQuantities.length > 1 && successCount > 0 && errorCount === 0) {
         printBulkSlip(bulkContext, createdMovements)
       }
-      resetForm()
-      setIsDialogOpen(false)
-      
-      if (successCount > 0 && errorCount === 0) {
-        alert(`${successCount} mouvement(s) créé(s) avec succès`)
-      } else if (successCount > 0 && errorCount > 0) {
-        alert(`${successCount} mouvement(s) créé(s), ${errorCount} erreur(s)`)
+
+      // Ne fermer le modal que si toutes les opérations ont réussi
+      if (errorCount === 0) {
+        resetForm()
+        setIsDialogOpen(false)
+        if (successCount > 0) {
+          alert(`${successCount} mouvement(s) créé(s) avec succès`)
+        }
       } else {
-        alert('Erreur lors de la création des mouvements')
+        // Garder le modal ouvert pour afficher les erreurs
+        // Afficher un message récapitulatif
+        if (successCount > 0) {
+          alert(`${successCount} mouvement(s) créé(s), ${errorCount} erreur(s). Veuillez corriger les erreurs ci-dessous.`)
+        } else {
+          alert(`${errorCount} erreur(s) lors de la création. Veuillez corriger les erreurs ci-dessous.`)
+        }
       }
     } catch (error) {
       console.error('Error creating movements:', error)
@@ -1388,6 +1421,7 @@ export default function MovementsManagement() {
       reason: "",
     })
     setFormErrors({})
+    setMovementErrors([]) // Réinitialiser les erreurs de mouvement
   }
 
   // Fonction pour gérer la sélection des cartes avec quantité
@@ -1565,7 +1599,13 @@ export default function MovementsManagement() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open)
+              if (!open) {
+                // Réinitialiser les erreurs quand on ferme le modal
+                setMovementErrors([])
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button onClick={resetForm} size="default" className="font-medium">
                   <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1655,7 +1695,7 @@ export default function MovementsManagement() {
                             }}
                             disabled={!formData.bankId}
                           >
-                            <SelectTrigger className={formErrors.fromLocationId ? "border-red-500" : ""}>
+                            <SelectTrigger>
                               <SelectValue placeholder={formData.bankId ? "Emplacement source" : "Sélectionnez d'abord une banque"} />
                             </SelectTrigger>
                             <SelectContent>
@@ -1666,9 +1706,6 @@ export default function MovementsManagement() {
                               ))}
                             </SelectContent>
                           </Select>
-                          {formErrors.fromLocationId && (
-                            <p className="text-sm text-red-500 mt-1">{formErrors.fromLocationId}</p>
-                          )}
                         </div>
                       </div>
                       
@@ -1723,7 +1760,7 @@ export default function MovementsManagement() {
                           }}
                           disabled={!formData.bankId}
                         >
-                          <SelectTrigger className={formErrors.toLocationId ? "border-red-500" : ""}>
+                          <SelectTrigger>
                             <SelectValue placeholder={formData.bankId ? "Emplacement destination" : "Sélectionnez d'abord une banque"} />
                           </SelectTrigger>
                           <SelectContent>
@@ -1734,9 +1771,6 @@ export default function MovementsManagement() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {formErrors.toLocationId && (
-                          <p className="text-sm text-red-500 mt-1">{formErrors.toLocationId}</p>
-                        )}
                       </div>
                     </div>
                   )}
@@ -1909,15 +1943,60 @@ export default function MovementsManagement() {
                     <Label htmlFor="reason" className="text-right mt-2 font-semibold">
                       Motif *
                     </Label>
-                    <Textarea
-                      id="reason"
-                      value={formData.reason}
-                      onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                      className="col-span-3"
-                      placeholder="Motif du mouvement"
-                      required
-                    />
+                    <div className="col-span-3">
+                      <Textarea
+                        id="reason"
+                        value={formData.reason}
+                        onChange={(e) => {
+                          setFormData({ ...formData, reason: e.target.value })
+                          if (formErrors.reason) {
+                            setFormErrors({ ...formErrors, reason: undefined })
+                          }
+                        }}
+                        placeholder="Motif du mouvement"
+                        required
+                      />
+                    </div>
                   </div>
+
+                  {/* Section centralisée pour tous les messages d'erreur */}
+                  {(Object.keys(formErrors).length > 0 || movementErrors.length > 0) && (
+                    <div className="px-0">
+                      <Alert variant="destructive">
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <AlertTitle>
+                          {movementErrors.length > 0 
+                            ? "Erreurs lors de la création des mouvements" 
+                            : "Erreurs de validation"}
+                        </AlertTitle>
+                        <AlertDescription>
+                          <div className="mt-2 space-y-2">
+                            {/* Erreurs de formulaire (champs obligatoires) */}
+                            {formErrors.fromLocationId && (
+                              <div className="text-sm">• <strong>Emplacement source:</strong> {formErrors.fromLocationId}</div>
+                            )}
+                            {formErrors.toLocationId && (
+                              <div className="text-sm">• <strong>Emplacement destination:</strong> {formErrors.toLocationId}</div>
+                            )}
+                            {formErrors.reason && (
+                              <div className="text-sm">• <strong>Motif:</strong> {formErrors.reason}</div>
+                            )}
+                            {formErrors.quantity && (
+                              <div className="text-sm">• <strong>Quantité:</strong> {formErrors.quantity}</div>
+                            )}
+                            {/* Erreurs de mouvement */}
+                            {movementErrors.map((err, idx) => (
+                              <div key={idx} className="text-sm">
+                                • <strong>{err.cardName}</strong> : {err.error}
+                              </div>
+                            ))}
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+                  )}
                 </div>
                 <DialogFooter className="flex-shrink-0 border-t pt-4 px-6 pb-4 bg-white">
                   <Button 
