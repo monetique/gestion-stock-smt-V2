@@ -379,7 +379,7 @@ export default function StatisticsPage() {
                 <div class="result-box">
                   <div class="percentage">${result.pourcentage.toFixed(2)}%</div>
                   <div class="description">
-                    Pourcentage de <strong>${result.fromLocationName || 'Emplacement De'}</strong> par rapport au total
+                    Pourcentage de <strong>${result.toLocationName || 'Emplacement Vers'}</strong> par rapport au total
                   </div>
                 </div>
 
@@ -403,8 +403,8 @@ export default function StatisticsPage() {
 
                 <div class="formula-box">
                   <div class="formula-title">Formule de calcul :</div>
-                  <div class="formula-line">Pourcentage = (Quantité De / (Quantité De + Quantité Vers)) × 100</div>
-                  <div class="formula-line">= (${result.quantiteDe.toLocaleString()} / ${result.total.toLocaleString()}) × 100</div>
+                  <div class="formula-line">Pourcentage = (Quantité Vers / (Quantité Vers + Quantité De)) × 100</div>
+                  <div class="formula-line">= (${result.quantiteVers.toLocaleString()} / ${result.total.toLocaleString()}) × 100</div>
                   <div class="formula-line">= ${result.pourcentage.toFixed(2)}%</div>
                 </div>
 
@@ -734,7 +734,7 @@ export default function StatisticsPage() {
                     <div className="text-sm text-slate-600">
                       {result.fromLocationName && result.toLocationName && (
                         <>
-                          Pourcentage de <strong>{result.fromLocationName}</strong> par rapport au total
+                          Pourcentage de <strong>{result.toLocationName}</strong> par rapport au total
                         </>
                       )}
                     </div>
@@ -777,10 +777,10 @@ export default function StatisticsPage() {
                   <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="text-sm font-semibold text-blue-900 mb-2">Formule de calcul :</div>
                     <div className="text-sm text-blue-800 font-mono">
-                      Pourcentage = (Quantité De / (Quantité De + Quantité Vers)) × 100
+                      Pourcentage = (Quantité Vers / (Quantité Vers + Quantité De)) × 100
                     </div>
                     <div className="text-sm text-blue-800 font-mono mt-2">
-                      = ({result.quantiteDe.toLocaleString()} / {result.total.toLocaleString()}) × 100
+                      = ({result.quantiteVers.toLocaleString()} / {result.total.toLocaleString()}) × 100
                     </div>
                     <div className="text-sm text-blue-800 font-mono mt-2">
                       = {result.pourcentage.toFixed(2)}%
