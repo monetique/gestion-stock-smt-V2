@@ -25,13 +25,16 @@ export function middleware(request: NextRequest) {
   console.log(`[Middleware] Méthode: ${request.method}`)
 
   // Ignorer les routes publiques
-  // Vérifier d'abord les correspondances exactes, puis les startsWith avec un slash pour éviter les faux positifs
+  // Traiter "/" séparément car toutes les routes commencent par "/"
   const isPublicRoute = publicRoutes.some((route) => {
+    if (route === "/") {
+      // "/" ne doit matcher que la route exacte "/"
+      return pathname === "/"
+    }
+    // Pour les autres routes, vérifier correspondance exacte ou startsWith avec vérification
     if (pathname === route) return true
-    // Pour les routes qui commencent par, s'assurer qu'il y a un / après ou que c'est exact
     if (pathname.startsWith(route)) {
-      // Si la route se termine par un chemin complet (pas juste un préfixe)
-      // Par exemple: "/api/auth/login" devrait matcher "/api/auth/login" mais pas "/api/auth/login/verify"
+      // Vérifier que le chemin suivant est vide ou commence par /
       const remainingPath = pathname.substring(route.length)
       return remainingPath === '' || remainingPath.startsWith('/')
     }
