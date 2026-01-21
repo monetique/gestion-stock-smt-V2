@@ -20,14 +20,22 @@ const protectedApiRoutes = ["/api"]
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+  
+  console.log(`[Middleware] Requête entrante: ${pathname}`)
+  console.log(`[Middleware] Méthode: ${request.method}`)
 
   // Ignorer les routes publiques
-  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(route))) {
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route))
+  console.log(`[Middleware] Route publique: ${isPublicRoute}`)
+  
+  if (isPublicRoute) {
+    console.log(`[Middleware] Route publique détectée, passage sans vérification`)
     return NextResponse.next()
   }
 
   // Vérifier si c'est une route API protégée
   const isProtectedApiRoute = protectedApiRoutes.some((route) => pathname.startsWith(route))
+  console.log(`[Middleware] Route API protégée: ${isProtectedApiRoute}`)
 
   if (isProtectedApiRoute) {
     // Extraire le token du header Authorization
