@@ -34,8 +34,13 @@ export function middleware(request: NextRequest) {
     const authHeader = request.headers.get("authorization")
     const token = extractTokenFromHeader(authHeader)
 
+    console.log(`[Middleware] Route API protégée: ${pathname}`)
+    console.log(`[Middleware] Authorization header présent: ${!!authHeader}`)
+    console.log(`[Middleware] Token extrait: ${token ? 'Oui (' + token.substring(0, 20) + '...)' : 'Non'}`)
+
     if (!token) {
       logger.warn("Unauthorized API request - No token provided", { pathname })
+      console.error(`[Middleware] ERREUR: Aucun token fourni pour ${pathname}`)
       return NextResponse.json(
         {
           success: false,
@@ -47,7 +52,9 @@ export function middleware(request: NextRequest) {
 
     try {
       // Vérifier le token
+      console.log(`[Middleware] Vérification du token pour ${pathname}...`)
       const payload = verifyAccessToken(token)
+      console.log(`[Middleware] ✓ Token valide pour utilisateur: ${payload.email}`)
 
       // Ajouter les données de l'utilisateur dans les headers pour les routes API
       const requestHeaders = new Headers(request.headers)
@@ -68,11 +75,15 @@ export function middleware(request: NextRequest) {
         },
       })
     } catch (error) {
-      logger.warn("Unauthorized API request - Invalid token", { pathname, error: String(error) })
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logger.warn("Unauthorized API request - Invalid token", { pathname, error: errorMessage })
+      console.error(`[Middleware] ERREUR: Token invalide pour ${pathname}`)
+      console.error(`[Middleware] Détails de l'erreur:`, errorMessage)
+      console.error(`[Middleware] Type d'erreur:`, error instanceof Error ? error.constructor.name : typeof error)
       return NextResponse.json(
         {
           success: false,
-          error: "Token invalide ou expiré. Veuillez vous reconnecter.",
+          error: `Token invalide ou expiré. Veuillez vous reconnecter. (${errorMessage})`,
         },
         { status: 401 }
       )

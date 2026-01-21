@@ -39,11 +39,24 @@ export interface JWTPayload {
  * Génère un token JWT d'accès
  */
 export function signAccessToken(payload: Omit<JWTPayload, "iat" | "exp">): string {
-  return jwt.sign(payload, JWT_SECRET, {
+  console.log(`[JWT] Génération du token d'accès pour: ${payload.email}`)
+  console.log(`[JWT] JWT_SECRET défini: ${!!JWT_SECRET}`)
+  console.log(`[JWT] Longueur JWT_SECRET: ${JWT_SECRET ? JWT_SECRET.length : 0}`)
+
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    const errorMsg = `JWT_SECRET invalide ou manquant lors de la signature (longueur: ${JWT_SECRET ? JWT_SECRET.length : 0})`
+    console.error(`[JWT] ERREUR: ${errorMsg}`)
+    throw new Error(errorMsg)
+  }
+
+  const token = jwt.sign(payload, JWT_SECRET, {
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
     issuer: "gestion-stock-smt",
     audience: "gestion-stock-smt-users",
   })
+
+  console.log(`[JWT] ✓ Token d'accès généré avec succès`)
+  return token
 }
 
 /**
@@ -70,19 +83,35 @@ export function signRefreshToken(payload: Omit<JWTPayload, "iat" | "exp">): stri
  */
 export function verifyAccessToken(token: string): JWTPayload {
   try {
+    // Logs de diagnostic
+    console.log(`[JWT] Vérification du token...`)
+    console.log(`[JWT] JWT_SECRET défini: ${!!JWT_SECRET}`)
+    console.log(`[JWT] Longueur JWT_SECRET: ${JWT_SECRET ? JWT_SECRET.length : 0}`)
+    console.log(`[JWT] Token (premiers 30 chars): ${token.substring(0, 30)}...`)
+
+    if (!JWT_SECRET || JWT_SECRET.length < 32) {
+      const errorMsg = `JWT_SECRET invalide ou manquant (longueur: ${JWT_SECRET ? JWT_SECRET.length : 0})`
+      console.error(`[JWT] ERREUR: ${errorMsg}`)
+      throw new Error(errorMsg)
+    }
+
     const decoded = jwt.verify(token, JWT_SECRET, {
       issuer: "gestion-stock-smt",
       audience: "gestion-stock-smt-users",
     }) as JWTPayload
 
+    console.log(`[JWT] ✓ Token vérifié avec succès pour: ${decoded.email}`)
     return decoded
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
+      console.error(`[JWT] ERREUR: Token expiré`)
       throw new Error("Token expiré")
     }
     if (error instanceof jwt.JsonWebTokenError) {
-      throw new Error("Token invalide")
+      console.error(`[JWT] ERREUR: Token invalide - ${error.message}`)
+      throw new Error(`Token invalide: ${error.message}`)
     }
+    console.error(`[JWT] ERREUR: ${error instanceof Error ? error.message : String(error)}`)
     throw error
   }
 }

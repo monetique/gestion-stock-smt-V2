@@ -84,27 +84,47 @@ export async function POST(request: NextRequest) {
     }
 
     logger.info('Login successful', { email: user.email })
+    console.log(`[Login API] ✓ Connexion réussie pour: ${user.email}`)
 
     // Générer les tokens JWT
-    const accessToken = signAccessToken({
-      userId: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-    })
+    console.log(`[Login API] Génération des tokens JWT...`)
+    let accessToken: string
+    let refreshToken: string
 
-    const refreshToken = signRefreshToken({
-      userId: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: user.role,
-    })
+    try {
+      accessToken = signAccessToken({
+        userId: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      })
+      console.log(`[Login API] ✓ Token d'accès généré`)
+
+      refreshToken = signRefreshToken({
+        userId: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      })
+      console.log(`[Login API] ✓ Token de rafraîchissement généré`)
+    } catch (tokenError) {
+      console.error(`[Login API] ERREUR lors de la génération des tokens:`, tokenError)
+      logger.error('Token generation error', tokenError)
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: `Erreur lors de la génération des tokens: ${tokenError instanceof Error ? tokenError.message : String(tokenError)}`,
+        },
+        { status: 500 },
+      )
+    }
 
     // Ne pas retourner le mot de passe
     const { password: _, ...userWithoutPassword } = user
 
+    console.log(`[Login API] ✓ Retour des tokens et données utilisateur`)
     // Retourner les tokens et les données utilisateur
     return NextResponse.json<ApiResponse<{ user: User; accessToken: string; refreshToken: string }>>({
       success: true,

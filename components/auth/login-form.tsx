@@ -36,22 +36,44 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
 
       const result = await response.json()
 
+      console.log('[LoginForm] Réponse du serveur:', {
+        success: result.success,
+        hasData: !!result.data,
+        error: result.error,
+      })
+
       if (result.success && result.data) {
         // L'API retourne { user, accessToken, refreshToken }
         const { user, accessToken, refreshToken } = result.data
         
+        console.log('[LoginForm] Données reçues:', {
+          hasUser: !!user,
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          userEmail: user?.email,
+        })
+        
         if (!user || !accessToken || !refreshToken) {
+          console.error('[LoginForm] ERREUR: Données incomplètes', {
+            user: !!user,
+            accessToken: !!accessToken,
+            refreshToken: !!refreshToken,
+          })
           setError("Erreur lors de la connexion : données incomplètes")
           setIsLoading(false)
           return
         }
 
         // Sauvegarder les tokens dans localStorage
+        console.log('[LoginForm] Sauvegarde des tokens dans localStorage...')
         saveAuthTokens(accessToken, refreshToken, user)
+        console.log('[LoginForm] ✓ Tokens sauvegardés')
         
         // Appeler le callback avec l'utilisateur
+        console.log('[LoginForm] Redirection vers /dashboard...')
         onLogin(user)
       } else {
+        console.error('[LoginForm] ERREUR: Connexion échouée', result.error)
         setError(result.error || "Email ou mot de passe incorrect")
         setIsLoading(false)
       }

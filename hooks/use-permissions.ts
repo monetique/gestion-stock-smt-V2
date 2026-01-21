@@ -35,9 +35,15 @@ export function usePermissions(): UserPermissions {
 
         // Récupérer l'utilisateur depuis l'API pour vérifier que le token est valide
         try {
+          console.log('[usePermissions] Vérification de l\'authentification via /api/auth/me...')
           const response = await authenticatedFetch('/api/auth/me')
           
+          console.log(`[usePermissions] Réponse /api/auth/me - Status: ${response.status}`)
+          
           if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}))
+            console.error(`[usePermissions] ERREUR: Authentification échouée - Status: ${response.status}`)
+            console.error(`[usePermissions] Détails de l'erreur:`, errorData)
             // Token invalide, nettoyer et arrêter
             clearAuthTokens()
             setUser(null)
