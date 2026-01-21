@@ -6,10 +6,20 @@
 import jwt from "jsonwebtoken"
 import { env } from "./env"
 
-// Secret pour signer les JWT (doit être dans les variables d'environnement)
+// Secret pour signer les JWT (utilise les valeurs validées depuis lib/env.ts)
 // En production, ces secrets DOIVENT être définis dans les variables d'environnement
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-secret-change-in-production-min-32-chars")
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-refresh-secret-change-in-production-min-32-chars")
+const JWT_SECRET = env.JWT_SECRET || process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-secret-change-in-production-min-32-chars")
+const JWT_REFRESH_SECRET = env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-refresh-secret-change-in-production-min-32-chars")
+
+// Vérifier que les secrets sont définis en production
+if (process.env.NODE_ENV === "production") {
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    throw new Error("JWT_SECRET doit être défini et contenir au moins 32 caractères en production")
+  }
+  if (!JWT_REFRESH_SECRET || JWT_REFRESH_SECRET.length < 32) {
+    throw new Error("JWT_REFRESH_SECRET doit être défini et contenir au moins 32 caractères en production")
+  }
+}
 
 // Durée de vie des tokens (en secondes)
 const ACCESS_TOKEN_EXPIRES_IN = 15 * 60 // 15 minutes
