@@ -18,7 +18,7 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Configuration
-APP_NAME="stock-management"
+APP_NAME="stock-app"
 APP_DIR="/var/www/stock-management"
 GIT_REPO="https://github.com/boujelbanemohamed/gestion-stock-smt-V2.git"
 ADMIN_EMAIL="mohamed.boujelbane@monetiquetunisie.com"

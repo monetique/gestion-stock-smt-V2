@@ -18,7 +18,7 @@ echo -e "${BLUE}═════════════════════�
 echo ""
 
 # Configuration
-APP_NAME="stock-management"
+APP_NAME="stock-app"
 APP_DIR="/var/www/stock-management"
 ADMIN_EMAIL="mohamed.boujelbane@monetiquetunisie.com"
 ADMIN_PASSWORD="SMT@2025"

@@ -17,7 +17,7 @@ echo -e "${BLUE}🔧 Résolution Complète des Problèmes${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════${NC}"
 echo ""
 
-APP_NAME="stock-management"
+APP_NAME="stock-app"
 APP_DIR="/var/www/stock-management"
 
 info() {

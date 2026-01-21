@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-APP_NAME="stock-management"
+APP_NAME="stock-app"
 APP_DIR="/var/www/stock-management"
 ADMIN_EMAIL="mohamed.boujelbane@monetiquetunisie.com"
 

@@ -62,7 +62,7 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     echo -e "${GREEN}✓ Secrets ajoutés à .env.production${NC}"
     echo ""
     echo "⚠️  IMPORTANT: Redémarrez l'application pour appliquer les changements:"
-    echo "   pm2 restart stock-management"
+    echo "   pm2 restart stock-app"
 else
     echo ""
     echo "Les secrets n'ont pas été ajoutés automatiquement."

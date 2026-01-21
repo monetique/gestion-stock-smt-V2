@@ -17,7 +17,7 @@ echo -e "${BLUE}🔧 Résolution: Port 3000 déjà utilisé${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════${NC}"
 echo ""
 
-APP_NAME="stock-management"
+APP_NAME="stock-app"
 
 info() {
     echo -e "${GREEN}✓${NC} $1"

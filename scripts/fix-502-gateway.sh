@@ -17,7 +17,7 @@ echo -e "${BLUE}🔧 Résolution Erreur 502 Bad Gateway${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════${NC}"
 echo ""
 
-APP_NAME="stock-management"
+APP_NAME="stock-app"
 APP_DIR="/var/www/stock-management"
 
 info() {

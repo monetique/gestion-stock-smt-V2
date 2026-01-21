@@ -37,7 +37,7 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-APP_NAME="stock-management"
+APP_NAME="stock-app"
 
 echo -e "${BLUE}Étape 1: Vérification des fichiers d'environnement...${NC}"
 
