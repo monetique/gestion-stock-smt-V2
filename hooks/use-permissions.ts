@@ -107,10 +107,15 @@ export function usePermissions(): UserPermissions {
           
           if (data.success && Array.isArray(data.data)) {
             // Trouver le rôle correspondant à l'utilisateur (insensible à la casse)
-            const userRole = data.data.find((role: any) => 
-              role && role.role && typeof role.role === 'string' &&
-              role.role.toLowerCase() === userData.role.toLowerCase()
-            )
+            const userRole = data.data.find((role: any) => {
+              if (!role || !role.role || typeof role.role !== 'string') {
+                return false
+              }
+              if (!userData || !userData.role || typeof userData.role !== 'string') {
+                return false
+              }
+              return role.role.toLowerCase() === userData.role.toLowerCase()
+            })
             
             if (userRole && Array.isArray(userRole.permissions)) {
               // Utiliser les permissions directement comme strings
@@ -123,13 +128,49 @@ export function usePermissions(): UserPermissions {
               setPermissions(userPermissions)
             } else {
               // Si le rôle n'est pas trouvé, utiliser des permissions par défaut
-              setPermissions([])
+              console.warn('[usePermissions] Rôle non trouvé dans /api/roles, utilisation des permissions par défaut')
+              const defaultPermissions: { [key: string]: Permission[] } = {
+                admin: [
+                  'dashboard:view', 'banks:view', 'cards:view', 'locations:view', 
+                  'movements:view', 'users:view', 'logs:view', 'config:view'
+                ],
+                expedition: [
+                  'dashboard:view', 'banks:view', 'movements:view'
+                ],
+                manager: [
+                  'dashboard:view', 'banks:view', 'cards:view', 'locations:view', 
+                  'movements:view', 'users:view'
+                ],
+                user: [
+                  'dashboard:view', 'banks:view', 'cards:view', 'locations:view', 'movements:view'
+                ]
+              }
+              const userRoleKey = userData?.role?.toLowerCase() || ''
+              setPermissions(defaultPermissions[userRoleKey] || [])
             }
           } else {
-            setPermissions([])
+            console.warn('[usePermissions] Réponse invalide de /api/roles, utilisation des permissions par défaut')
+            const defaultPermissions: { [key: string]: Permission[] } = {
+              admin: [
+                'dashboard:view', 'banks:view', 'cards:view', 'locations:view', 
+                'movements:view', 'users:view', 'logs:view', 'config:view'
+              ],
+              expedition: [
+                'dashboard:view', 'banks:view', 'movements:view'
+              ],
+              manager: [
+                'dashboard:view', 'banks:view', 'cards:view', 'locations:view', 
+                'movements:view', 'users:view'
+              ],
+              user: [
+                'dashboard:view', 'banks:view', 'cards:view', 'locations:view', 'movements:view'
+              ]
+            }
+            const userRoleKey = userData?.role?.toLowerCase() || ''
+            setPermissions(defaultPermissions[userRoleKey] || [])
           }
         } catch (apiError) {
-          console.error('Error fetching permissions from API:', apiError)
+          console.error('[usePermissions] Erreur lors de la récupération des permissions:', apiError)
           // En cas d'erreur API, utiliser des permissions par défaut
           const defaultPermissions: { [key: string]: Permission[] } = {
             admin: [
@@ -147,7 +188,8 @@ export function usePermissions(): UserPermissions {
               'dashboard:view', 'banks:view', 'cards:view', 'locations:view', 'movements:view'
             ]
           }
-          setPermissions(defaultPermissions[userData.role] || [])
+          const userRoleKey = userData?.role?.toLowerCase() || ''
+          setPermissions(defaultPermissions[userRoleKey] || [])
         }
         
           setIsLoading(false)

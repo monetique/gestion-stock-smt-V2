@@ -207,7 +207,19 @@ export default function DashboardLayout({
       // Extraire module et action de la permission (format "module:action")
       const [module, action] = item.permission.split(':')
       if (!module || !action) return false
-      return hasPermission(module as any, action as any)
+      
+      // Vérifier que hasPermission est disponible
+      if (!hasPermission || typeof hasPermission !== 'function') {
+        console.warn('[Layout] hasPermission non disponible')
+        return false
+      }
+      
+      try {
+        return hasPermission(module as any, action as any)
+      } catch (error) {
+        console.error('[Layout] Erreur lors de la vérification de permission:', error)
+        return false
+      }
     })
     
     setNavigation(filteredNav)
@@ -300,8 +312,8 @@ export default function DashboardLayout({
           <div className="flex items-center space-x-3 mb-3">
             <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center">
               <span className="text-sm font-medium text-slate-700">
-                {currentUser?.firstName?.[0] || ''}
-                {currentUser?.lastName?.[0] || ''}
+                {(currentUser?.firstName && currentUser.firstName.length > 0) ? currentUser.firstName[0] : ''}
+                {(currentUser?.lastName && currentUser.lastName.length > 0) ? currentUser.lastName[0] : ''}
               </span>
             </div>
             <div className="flex-1 min-w-0">
