@@ -117,10 +117,12 @@ export const config = {
      * - _next/image (optimisation d'images)
      * - favicon.ico (favicon)
      * - fichiers images
+     * 
+     * IMPORTANT: Le pattern doit matcher les routes API
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-    // Inclure explicitement les routes API
-    "/api/:path*",
+    // Inclure explicitement toutes les routes API (syntaxe Next.js)
+    "/api/(.*)",
   ],
 }
 
