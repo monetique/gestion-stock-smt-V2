@@ -11,6 +11,33 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  // Configuration pour éviter les erreurs de chunks
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals.push({
+        '@prisma/client': 'commonjs @prisma/client',
+      })
+    }
+    // Ajouter une configuration pour gérer les chunks
+    config.optimization = {
+      ...config.optimization,
+      splitChunks: {
+        chunks: 'all',
+        cacheGroups: {
+          default: false,
+          vendors: false,
+          framework: {
+            name: 'framework',
+            chunks: 'all',
+            test: /(?<!node_modules.*)[\\/]node_modules[\\/](react|react-dom|scheduler|use-subscription)[\\/]/,
+            priority: 40,
+            enforce: true,
+          },
+        },
+      },
+    }
+    return config
+  },
   // Exclure les routes API du pre-rendering
   experimental: {
     serverActions: {
