@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/db"
 import type { ApiResponse } from "@/lib/api-types"
 import type { User } from "@/lib/types"
+import { verifyAuth } from "@/lib/auth-middleware"
 
 // GET /api/auth/me - Récupérer l'utilisateur connecté
 
@@ -13,32 +14,18 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`[API /auth/me] Requête reçue`)
     
-    // Récupérer les données utilisateur depuis le header ajouté par le middleware
-    const userHeader = request.headers.get("x-user-data")
-    console.log(`[API /auth/me] Header x-user-data présent: ${!!userHeader}`)
-    console.log(`[API /auth/me] Header x-user-data valeur: ${userHeader ? userHeader.substring(0, 50) + '...' : 'N/A'}`)
-
-    if (!userHeader) {
-      console.error(`[API /auth/me] ERREUR: Header x-user-data manquant`)
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "Non authentifié - Header x-user-data manquant (le middleware n'a pas ajouté les données utilisateur)",
-        },
-        { status: 401 },
-      )
-    }
-
+    // Vérifier l'authentification et récupérer les données utilisateur
     let userData
     try {
-      userData = JSON.parse(userHeader)
-      console.log(`[API /auth/me] Données utilisateur parsées: ${userData.email}`)
-    } catch (error) {
-      console.error(`[API /auth/me] ERREUR: Impossible de parser x-user-data:`, error)
+      userData = verifyAuth(request)
+      console.log(`[API /auth/me] ✓ Utilisateur authentifié: ${userData.email}`)
+    } catch (authError) {
+      const errorMessage = authError instanceof Error ? authError.message : String(authError)
+      console.error(`[API /auth/me] ERREUR: Authentification échouée - ${errorMessage}`)
       return NextResponse.json<ApiResponse>(
         {
           success: false,
-          error: "Données utilisateur invalides - Impossible de parser le header x-user-data",
+          error: errorMessage,
         },
         { status: 401 },
       )

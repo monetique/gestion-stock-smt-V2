@@ -47,69 +47,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Vérifier si c'est une route API protégée
+  // NOTE: La vérification JWT ne peut pas être faite dans le middleware
+  // car le middleware s'exécute dans Edge Runtime qui ne supporte pas le module Node.js 'crypto'
+  // La vérification JWT sera faite directement dans les routes API qui utilisent Node.js runtime
+  
+  // Pour les routes API protégées, on passe simplement la requête
+  // La vérification du token se fera dans chaque route API individuelle
   const isProtectedApiRoute = protectedApiRoutes.some((route) => pathname.startsWith(route))
   console.log(`[Middleware] Route API protégée: ${isProtectedApiRoute}`)
-
+  
   if (isProtectedApiRoute) {
-    // Extraire le token du header Authorization
-    const authHeader = request.headers.get("authorization")
-    const token = extractTokenFromHeader(authHeader)
-
-    console.log(`[Middleware] Route API protégée: ${pathname}`)
-    console.log(`[Middleware] Authorization header présent: ${!!authHeader}`)
-    console.log(`[Middleware] Token extrait: ${token ? 'Oui (' + token.substring(0, 20) + '...)' : 'Non'}`)
-
-    if (!token) {
-      logger.warn("Unauthorized API request - No token provided", { pathname })
-      console.error(`[Middleware] ERREUR: Aucun token fourni pour ${pathname}`)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Authentification requise. Token manquant.",
-        },
-        { status: 401 }
-      )
-    }
-
-    try {
-      // Vérifier le token
-      console.log(`[Middleware] Vérification du token pour ${pathname}...`)
-      const payload = verifyAccessToken(token)
-      console.log(`[Middleware] ✓ Token valide pour utilisateur: ${payload.email}`)
-
-      // Ajouter les données de l'utilisateur dans les headers pour les routes API
-      const requestHeaders = new Headers(request.headers)
-      requestHeaders.set(
-        "x-user-data",
-        JSON.stringify({
-          id: payload.userId,
-          email: payload.email,
-          firstName: payload.firstName,
-          lastName: payload.lastName,
-          role: payload.role,
-        })
-      )
-
-      return NextResponse.next({
-        request: {
-          headers: requestHeaders,
-        },
-      })
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.warn("Unauthorized API request - Invalid token", { pathname, error: errorMessage })
-      console.error(`[Middleware] ERREUR: Token invalide pour ${pathname}`)
-      console.error(`[Middleware] Détails de l'erreur:`, errorMessage)
-      console.error(`[Middleware] Type d'erreur:`, error instanceof Error ? error.constructor.name : typeof error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Token invalide ou expiré. Veuillez vous reconnecter. (${errorMessage})`,
-        },
-        { status: 401 }
-      )
-    }
+    console.log(`[Middleware] Route API protégée détectée: ${pathname} - La vérification JWT se fera dans la route API`)
+    // Passer la requête sans modification
+    // Les routes API vérifieront elles-mêmes le token JWT
+    return NextResponse.next()
   }
 
   // Pour les routes dashboard, on ne peut pas vérifier le token côté serveur
@@ -133,13 +84,14 @@ export const config = {
      * - fichiers images
      * 
      * IMPORTANT: Le pattern doit matcher les routes API
+     * 
+     * NOTE: Le middleware s'exécute dans Edge Runtime et ne peut pas utiliser
+     * le module Node.js 'crypto' nécessaire pour jsonwebtoken.
+     * La vérification JWT se fait donc directement dans les routes API.
      */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
     // Inclure explicitement toutes les routes API (syntaxe Next.js)
     "/api/(.*)",
   ],
-  // Forcer le runtime Node.js au lieu de Edge Runtime
-  // Nécessaire car jsonwebtoken utilise le module Node.js 'crypto'
-  runtime: 'nodejs',
 }
 
