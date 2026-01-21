@@ -16,6 +16,10 @@ const serverEnvSchema = z.object({
   // URL de l'API (optionnel, avec valeur par défaut)
   NEXT_PUBLIC_API_URL: z.string().url().optional(),
   
+  // JWT Secrets (optionnels en développement, requis en production)
+  JWT_SECRET: z.string().min(32, "JWT_SECRET doit contenir au moins 32 caractères").optional(),
+  JWT_REFRESH_SECRET: z.string().min(32, "JWT_REFRESH_SECRET doit contenir au moins 32 caractères").optional(),
+  
   // Variables optionnelles pour le développement
   ESLINT_DISABLE: z.string().optional(),
   TYPESCRIPT_DISABLE: z.string().optional(),
@@ -36,6 +40,8 @@ function getServerEnv() {
       DATABASE_URL: process.env.DATABASE_URL,
       NODE_ENV: process.env.NODE_ENV || "development",
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+      JWT_SECRET: process.env.JWT_SECRET,
+      JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
       ESLINT_DISABLE: process.env.ESLINT_DISABLE,
       TYPESCRIPT_DISABLE: process.env.TYPESCRIPT_DISABLE,
     })
@@ -100,6 +106,8 @@ try {
     DATABASE_URL: process.env.DATABASE_URL || "postgresql://user:password@localhost:5432/db",
     NODE_ENV: "development",
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    JWT_SECRET: process.env.JWT_SECRET,
+    JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   } as z.infer<typeof serverEnvSchema>
   
   publicEnv = {

@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db"
 import * as bcrypt from "bcryptjs"
 import type { ApiResponse } from "@/lib/api-types"
 import type { User } from "@/lib/types"
+import { signAccessToken, signRefreshToken } from "@/lib/auth"
+import { loginRateLimiter } from "@/lib/rate-limiter"
+import { logger } from "@/lib/logger"
 
 // Forcer la route à être dynamique (ne pas pré-rendre)
 export const dynamic = 'force-dynamic'
@@ -10,15 +13,21 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Login API called')
+    // Appliquer le rate limiting pour les tentatives de connexion
+    const rateLimitResponse = loginRateLimiter(request)
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
+
+    logger.debug('Login API called')
     
     const body = await request.json()
     const { email, password } = body
 
-    console.log('Login attempt for email:', email)
+    logger.debug('Login attempt', { email })
 
     if (!email || !password) {
-      console.log('Missing email or password')
+      logger.warn('Missing email or password')
       return NextResponse.json<ApiResponse>(
         {
           success: false,
@@ -29,13 +38,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Chercher l'utilisateur par email
-    console.log('Searching for user in database...')
+    logger.debug('Searching for user in database')
     const user = await prisma.user.findUnique({
       where: { email }
     })
 
     if (!user) {
-      console.log('User not found:', email)
+      logger.warn('User not found', { email })
       return NextResponse.json<ApiResponse>(
         {
           success: false,
@@ -45,11 +54,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('User found:', user.email, 'isActive:', user.isActive)
+    logger.debug('User found', { email: user.email, isActive: user.isActive })
 
     // Vérifier que l'utilisateur est actif
     if (!user.isActive) {
-      console.log('User account is inactive')
+      logger.warn('User account is inactive', { email })
       return NextResponse.json<ApiResponse>(
         {
           success: false,
@@ -60,11 +69,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Vérifier le mot de passe
-    console.log('Verifying password...')
+    logger.debug('Verifying password')
     const isValidPassword = await bcrypt.compare(password, user.password)
 
     if (!isValidPassword) {
-      console.log('Invalid password')
+      logger.warn('Invalid password', { email })
       return NextResponse.json<ApiResponse>(
         {
           success: false,
@@ -74,18 +83,40 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('Login successful for user:', user.email)
+    logger.info('Login successful', { email: user.email })
+
+    // Générer les tokens JWT
+    const accessToken = signAccessToken({
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    })
+
+    const refreshToken = signRefreshToken({
+      userId: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+    })
 
     // Ne pas retourner le mot de passe
     const { password: _, ...userWithoutPassword } = user
 
-    return NextResponse.json<ApiResponse<User>>({
+    // Retourner les tokens et les données utilisateur
+    return NextResponse.json<ApiResponse<{ user: User; accessToken: string; refreshToken: string }>>({
       success: true,
-      data: userWithoutPassword as User,
+      data: {
+        user: userWithoutPassword as User,
+        accessToken,
+        refreshToken,
+      },
       message: "Connexion réussie",
     })
   } catch (error) {
-    console.error('Login error:', error)
+    logger.error('Login error', error)
     return NextResponse.json<ApiResponse>(
       {
         success: false,

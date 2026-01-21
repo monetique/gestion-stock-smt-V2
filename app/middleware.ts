@@ -1,0 +1,106 @@
+/**
+ * Middleware Next.js pour l'authentification et la protection des routes
+ * Vérifie les tokens JWT sur toutes les routes protégées
+ */
+
+import { NextRequest, NextResponse } from "next/server"
+import { verifyAccessToken, extractTokenFromHeader } from "@/lib/auth"
+import { logger } from "@/lib/logger"
+
+// Routes publiques (ne nécessitent pas d'authentification)
+const publicRoutes = [
+  "/",
+  "/login",
+  "/api/auth/login",
+  "/api/auth/refresh",
+]
+
+// Routes API qui nécessitent une authentification
+const protectedApiRoutes = ["/api"]
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // Ignorer les routes publiques
+  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(route))) {
+    return NextResponse.next()
+  }
+
+  // Vérifier si c'est une route API protégée
+  const isProtectedApiRoute = protectedApiRoutes.some((route) => pathname.startsWith(route))
+
+  if (isProtectedApiRoute) {
+    // Extraire le token du header Authorization
+    const authHeader = request.headers.get("authorization")
+    const token = extractTokenFromHeader(authHeader)
+
+    if (!token) {
+      logger.warn("Unauthorized API request - No token provided", { pathname })
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Authentification requise. Token manquant.",
+        },
+        { status: 401 }
+      )
+    }
+
+    try {
+      // Vérifier le token
+      const payload = verifyAccessToken(token)
+
+      // Ajouter les données de l'utilisateur dans les headers pour les routes API
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set(
+        "x-user-data",
+        JSON.stringify({
+          id: payload.userId,
+          email: payload.email,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          role: payload.role,
+        })
+      )
+
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      })
+    } catch (error) {
+      logger.warn("Unauthorized API request - Invalid token", { pathname, error: String(error) })
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Token invalide ou expiré. Veuillez vous reconnecter.",
+        },
+        { status: 401 }
+      )
+    }
+  }
+
+  // Pour les routes dashboard, on ne peut pas vérifier le token côté serveur
+  // car les tokens sont dans localStorage côté client.
+  // La vérification sera faite côté client dans les composants.
+  // On autorise l'accès et la page client vérifiera l'authentification.
+  // Note: Les API appelées depuis ces pages seront protégées par le middleware ci-dessus.
+
+  // Par défaut, autoriser l'accès
+  return NextResponse.next()
+}
+
+// Configurer les matchers pour optimiser les performances
+export const config = {
+  matcher: [
+    /*
+     * Match toutes les requêtes sauf:
+     * - api (routes API)
+     * - _next/static (fichiers statiques)
+     * - _next/image (optimisation d'images)
+     * - favicon.ico (favicon)
+     * - public (fichiers publics)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
+}
+
