@@ -236,8 +236,9 @@ echo -e "${BLUE}Étape 8: Mise à jour de l'utilisateur admin...${NC}"
 read -p "Mettre à jour l'utilisateur admin ($ADMIN_EMAIL)? (Y/n) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-    # Script pour créer/mettre à jour l'admin
-    cat > /tmp/update-admin.js << 'ADMINSCRIPT'
+    # Script pour créer/mettre à jour l'admin (dans le répertoire du projet pour accéder à node_modules)
+    ADMIN_SCRIPT="$APP_DIR/update-admin-temp.js"
+    cat > "$ADMIN_SCRIPT" << 'ADMINSCRIPT'
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
@@ -296,8 +297,9 @@ async function updateAdmin() {
 updateAdmin();
 ADMINSCRIPT
 
-    ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" node /tmp/update-admin.js
-    rm /tmp/update-admin.js
+    # Exécuter depuis le répertoire du projet pour que node_modules soit accessible
+    ADMIN_EMAIL="$ADMIN_EMAIL" ADMIN_PASSWORD="$ADMIN_PASSWORD" node "$ADMIN_SCRIPT"
+    rm -f "$ADMIN_SCRIPT"
     info "Utilisateur admin mis à jour"
 else
     info "Mise à jour de l'utilisateur admin ignorée"
