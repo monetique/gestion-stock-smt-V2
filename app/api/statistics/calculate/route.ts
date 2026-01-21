@@ -109,12 +109,12 @@ export async function POST(request: NextRequest) {
         .reduce((sum, m) => sum + m.quantity, 0)
     }
 
-    // Calculer le pourcentage global : (Quantité De / (Quantité De + Quantité Vers)) * 100
+    // Calculer le pourcentage global : (Quantité Vers / (Quantité Vers + Quantité De)) * 100
     const total = quantiteDe + quantiteVers
     let pourcentage = 0
 
     if (total > 0) {
-      pourcentage = (quantiteDe / total) * 100
+      pourcentage = (quantiteVers / total) * 100
     }
 
     // Statistiques détaillées par date, banque, type de mouvement et type de carte
@@ -224,16 +224,17 @@ export async function POST(request: NextRequest) {
     })
 
     // Calculer les totaux et pourcentages pour chaque banque et type de carte
+    // Formule: (Quantité Vers / (Quantité Vers + Quantité De)) * 100
     Object.keys(statsByBank).forEach(bankKey => {
       const bankStats = statsByBank[bankKey]
       bankStats.total = bankStats.quantiteDe + bankStats.quantiteVers
-      bankStats.pourcentage = bankStats.total > 0 ? (bankStats.quantiteDe / bankStats.total) * 100 : 0
+      bankStats.pourcentage = bankStats.total > 0 ? (bankStats.quantiteVers / bankStats.total) * 100 : 0
 
       // Calculer pour chaque type de carte
       Object.keys(bankStats.statsByCardType).forEach(cardType => {
         const cardStats = bankStats.statsByCardType[cardType]
         cardStats.total = cardStats.quantiteDe + cardStats.quantiteVers
-        cardStats.pourcentage = cardStats.total > 0 ? (cardStats.quantiteDe / cardStats.total) * 100 : 0
+        cardStats.pourcentage = cardStats.total > 0 ? (cardStats.quantiteVers / cardStats.total) * 100 : 0
       })
     })
 
