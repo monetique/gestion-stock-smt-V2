@@ -50,9 +50,10 @@ export default function HomePage() {
   }, [])
 
   const handleLogin = (user: User) => {
-    // Sauvegarder l'utilisateur dans localStorage
-    localStorage.setItem('currentUser', JSON.stringify(user))
+    // Les tokens sont déjà sauvegardés par LoginForm via saveAuthTokens
+    // On met juste à jour l'état et on redirige
     setCurrentUser(user)
+    // Utiliser window.location.href pour une redirection complète
     window.location.href = "/dashboard"
   }
 

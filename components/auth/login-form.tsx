@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { User } from "@/lib/types"
+import { saveAuthTokens } from "@/lib/api-client"
 import Image from "next/image"
 
 interface LoginFormProps {
@@ -16,8 +17,8 @@ interface LoginFormProps {
 }
 
 export default function LoginForm({ onLogin }: LoginFormProps) {
-  const [email, setEmail] = useState("admin@monetique.tn")
-  const [password, setPassword] = useState("password123")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -36,16 +37,29 @@ export default function LoginForm({ onLogin }: LoginFormProps) {
       const result = await response.json()
 
       if (result.success && result.data) {
-        onLogin(result.data)
+        // L'API retourne { user, accessToken, refreshToken }
+        const { user, accessToken, refreshToken } = result.data
+        
+        if (!user || !accessToken || !refreshToken) {
+          setError("Erreur lors de la connexion : données incomplètes")
+          setIsLoading(false)
+          return
+        }
+
+        // Sauvegarder les tokens dans localStorage
+        saveAuthTokens(accessToken, refreshToken, user)
+        
+        // Appeler le callback avec l'utilisateur
+        onLogin(user)
       } else {
         setError(result.error || "Email ou mot de passe incorrect")
+        setIsLoading(false)
       }
     } catch (error) {
       console.error('Login error:', error)
       setError("Erreur de connexion au serveur")
+      setIsLoading(false)
     }
-    
-    setIsLoading(false)
   }
 
   return (
