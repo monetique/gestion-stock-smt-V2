@@ -200,11 +200,13 @@ export default function DashboardLayout({
       
       // Extraire module et action de la permission (format "module:action")
       const [module, action] = item.permission.split(':')
+      if (!module || !action) return false
       return hasPermission(module as any, action as any)
     })
     
     setNavigation(filteredNav)
-  }, [currentUser, hasPermission, isLoading])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, isLoading]) // Utiliser currentUser?.id au lieu de currentUser pour éviter les re-renders
 
   const handleLogout = async () => {
     try {
@@ -300,8 +302,8 @@ export default function DashboardLayout({
               <p className="text-sm font-medium text-slate-900 truncate">
                 {currentUser.firstName} {currentUser.lastName}
               </p>
-              <Badge variant={getRoleBadgeVariant(currentUser.role)} className="text-xs">
-                {currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)}
+              <Badge variant={getRoleBadgeVariant(currentUser.role || 'user')} className="text-xs">
+                {currentUser.role ? (currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)) : 'User'}
               </Badge>
             </div>
           </div>
