@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import type { User, Permission, Module, Action } from "@/lib/types"
+import { authenticatedFetch, clearAuthTokens } from "@/lib/api-client"
 
 interface UserPermissions {
   user: User | null
@@ -22,38 +23,56 @@ export function usePermissions(): UserPermissions {
     
     const loadUserAndPermissions = async () => {
       try {
-        // Récupérer l'utilisateur depuis localStorage
-        const storedUser = localStorage.getItem('currentUser')
-        if (!storedUser) {
+        // Vérifier d'abord que le token est valide
+        const accessToken = localStorage.getItem('accessToken')
+        if (!accessToken) {
+          clearAuthTokens()
           setUser(null)
           setPermissions([])
           setIsLoading(false)
           return
         }
 
-        let userData: User
+        // Récupérer l'utilisateur depuis l'API pour vérifier que le token est valide
         try {
-          userData = JSON.parse(storedUser) as User
-        } catch (parseError) {
-          console.error('Error parsing stored user:', parseError)
-          setUser(null)
-          setPermissions([])
-          setIsLoading(false)
-          return
-        }
+          const response = await authenticatedFetch('/api/auth/me')
+          
+          if (!response.ok) {
+            // Token invalide, nettoyer et arrêter
+            clearAuthTokens()
+            setUser(null)
+            setPermissions([])
+            setIsLoading(false)
+            return
+          }
 
-        // Vérifier que userData a les propriétés requises
-        if (!userData || !userData.role || typeof userData.role !== 'string') {
-          console.error('Invalid user data:', userData)
-          setUser(null)
-          setPermissions([])
-          setIsLoading(false)
-          return
-        }
+          const data = await response.json()
+          if (!data.success || !data.data) {
+            clearAuthTokens()
+            setUser(null)
+            setPermissions([])
+            setIsLoading(false)
+            return
+          }
 
-        setUser(userData)
+          const userData = data.data as User
 
-        // Si c'est un super_admin ou admin, donner toutes les permissions
+          // Vérifier que userData a les propriétés requises
+          if (!userData || !userData.role || typeof userData.role !== 'string') {
+            console.error('Invalid user data from API:', userData)
+            clearAuthTokens()
+            setUser(null)
+            setPermissions([])
+            setIsLoading(false)
+            return
+          }
+
+          // Mettre à jour le localStorage avec les données fraîches
+          localStorage.setItem('currentUser', JSON.stringify(userData))
+
+          setUser(userData)
+
+          // Si c'est un super_admin ou admin, donner toutes les permissions
         const roleLower = userData.role.toLowerCase()
         if (roleLower === 'super_admin' || roleLower === 'admin') {
           const allModules: Module[] = ['dashboard', 'banks', 'cards', 'locations', 'movements', 'users', 'logs', 'config']
@@ -125,9 +144,18 @@ export function usePermissions(): UserPermissions {
           setPermissions(defaultPermissions[userData.role] || [])
         }
         
-        setIsLoading(false)
+          setIsLoading(false)
+        } catch (apiError) {
+          console.error('Error fetching user from API:', apiError)
+          clearAuthTokens()
+          setUser(null)
+          setPermissions([])
+          setIsLoading(false)
+          return
+        }
       } catch (error) {
         console.error('Error loading permissions:', error)
+        clearAuthTokens()
         setUser(null)
         setPermissions([])
         setIsLoading(false)

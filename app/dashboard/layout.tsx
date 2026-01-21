@@ -189,6 +189,12 @@ export default function DashboardLayout({
     if (isLoading) return
     
     if (!currentUser) {
+      // Nettoyer les tokens avant de rediriger
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
+        localStorage.removeItem('currentUser')
+      }
       window.location.href = "/"
       return
     }
