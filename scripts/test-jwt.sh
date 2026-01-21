@@ -36,12 +36,12 @@ fi
 echo ""
 echo "2. Vérification dans le code:"
 echo "   Vérifiez les logs PM2 pour voir si JWT_SECRET est bien chargé:"
-echo "   pm2 logs stock-management --lines 50 | grep -i jwt"
+echo "   pm2 logs stock-app --lines 50 | grep -i jwt"
 
 echo ""
 echo "3. Test de connexion:"
 echo "   Essayez de vous connecter et vérifiez les logs:"
-echo "   pm2 logs stock-management --err --lines 20"
+echo "   pm2 logs stock-app --err --lines 20"
 
 echo ""
 echo "4. Si le problème persiste, vérifiez que les secrets sont identiques partout:"
