@@ -11,11 +11,10 @@ export const runtime = 'nodejs'
 
 export async function GET(request: NextRequest) {
   try {
-    // Dans une vraie app, on récupérerait l'ID depuis le token/session
-    // Pour l'instant, on simule avec l'email dans le header
-    const email = request.headers.get("x-user-email")
+    // Récupérer les données utilisateur depuis le header ajouté par le middleware
+    const userHeader = request.headers.get("x-user-data")
 
-    if (!email) {
+    if (!userHeader) {
       return NextResponse.json<ApiResponse>(
         {
           success: false,
@@ -25,8 +24,22 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    let userData
+    try {
+      userData = JSON.parse(userHeader)
+    } catch (error) {
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: "Données utilisateur invalides",
+        },
+        { status: 401 },
+      )
+    }
+
+    // Récupérer l'utilisateur complet depuis la base de données
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { id: userData.id }
     })
 
     if (!user) {

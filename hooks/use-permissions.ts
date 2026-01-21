@@ -31,11 +31,31 @@ export function usePermissions(): UserPermissions {
           return
         }
 
-        const userData = JSON.parse(storedUser) as User
+        let userData: User
+        try {
+          userData = JSON.parse(storedUser) as User
+        } catch (parseError) {
+          console.error('Error parsing stored user:', parseError)
+          setUser(null)
+          setPermissions([])
+          setIsLoading(false)
+          return
+        }
+
+        // Vérifier que userData a les propriétés requises
+        if (!userData || !userData.role || typeof userData.role !== 'string') {
+          console.error('Invalid user data:', userData)
+          setUser(null)
+          setPermissions([])
+          setIsLoading(false)
+          return
+        }
+
         setUser(userData)
 
         // Si c'est un super_admin ou admin, donner toutes les permissions
-        if (userData.role === 'super_admin' || userData.role === 'admin') {
+        const roleLower = userData.role.toLowerCase()
+        if (roleLower === 'super_admin' || roleLower === 'admin') {
           const allModules: Module[] = ['dashboard', 'banks', 'cards', 'locations', 'movements', 'users', 'logs', 'config']
           const allActions: Action[] = ['view', 'create', 'update', 'delete', 'import', 'export', 'print']
           const userPermissions = allModules.flatMap(module => 
@@ -47,21 +67,34 @@ export function usePermissions(): UserPermissions {
         }
         // Récupérer les permissions depuis la base de données
         try {
-          const response = await fetch('/api/roles')
+          const response = await fetch('/api/roles', {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+          
           const data = await response.json()
           
-          if (data.success) {
+          if (data.success && Array.isArray(data.data)) {
             // Trouver le rôle correspondant à l'utilisateur (insensible à la casse)
             const userRole = data.data.find((role: any) => 
+              role && role.role && typeof role.role === 'string' &&
               role.role.toLowerCase() === userData.role.toLowerCase()
             )
             
-            if (userRole) {
+            if (userRole && Array.isArray(userRole.permissions)) {
               // Utiliser les permissions directement comme strings
-              const userPermissions = userRole.permissions.map((permission: string) => {
-                // Normaliser les actions : read -> view, create/update/delete restent identiques
-                return permission.replace(':read', ':view')
-              })
+              const userPermissions = userRole.permissions
+                .filter((p: any) => typeof p === 'string')
+                .map((permission: string) => {
+                  // Normaliser les actions : read -> view, create/update/delete restent identiques
+                  return permission.replace(':read', ':view')
+                })
               setPermissions(userPermissions)
             } else {
               // Si le rôle n'est pas trouvé, utiliser des permissions par défaut
