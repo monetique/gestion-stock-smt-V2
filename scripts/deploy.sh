@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_NAME="gestion-stock-smt-V2"
+APP_NAME="stock-app"
 BACKUP_DIR="./backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
@@ -66,13 +66,16 @@ else
     warn "pg_dump non trouvé. Sauvegardez manuellement votre base de données."
 fi
 
-# Étape 4: Sauvegarde du fichier .env
-info "Sauvegarde du fichier .env..."
-if [ -f ".env" ]; then
+# Étape 4: Sauvegarde des fichiers d'environnement
+info "Sauvegarde des fichiers d'environnement..."
+if [ -f ".env.production" ]; then
+    cp .env.production "$BACKUP_DIR/.env.production.backup.$TIMESTAMP"
+    info "Fichier .env.production sauvegardé dans $BACKUP_DIR/.env.production.backup.$TIMESTAMP"
+elif [ -f ".env" ]; then
     cp .env "$BACKUP_DIR/.env.backup.$TIMESTAMP"
     info "Fichier .env sauvegardé dans $BACKUP_DIR/.env.backup.$TIMESTAMP"
 else
-    warn "Fichier .env introuvable. Assurez-vous qu'il existe."
+    warn "Aucun fichier .env ou .env.production trouvé. Assurez-vous qu'il existe."
 fi
 
 # Étape 5: Sauvegarde des modifications Git locales
@@ -100,26 +103,31 @@ info "Client Prisma régénéré"
 
 # Étape 9: Vérifier les variables d'environnement JWT
 info "Vérification des variables d'environnement JWT..."
-if [ -f ".env" ]; then
-    if ! grep -q "JWT_SECRET" .env; then
-        warn "JWT_SECRET non trouvé dans .env"
-        warn "IMPORTANT: Ajoutez JWT_SECRET dans .env avant de continuer"
+ENV_FILE=".env.production"
+if [ ! -f "$ENV_FILE" ]; then
+    ENV_FILE=".env"
+fi
+
+if [ -f "$ENV_FILE" ]; then
+    if ! grep -q "JWT_SECRET" "$ENV_FILE"; then
+        warn "JWT_SECRET non trouvé dans $ENV_FILE"
+        warn "IMPORTANT: Ajoutez JWT_SECRET dans $ENV_FILE avant de continuer"
         warn "Générez avec: openssl rand -base64 32"
         read -p "Voulez-vous continuer sans JWT_SECRET? (y/N) " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            error "Déploiement annulé. Configurez JWT_SECRET et JWT_REFRESH_SECRET dans .env"
+            error "Déploiement annulé. Configurez JWT_SECRET et JWT_REFRESH_SECRET dans $ENV_FILE"
             exit 1
         fi
     fi
     
-    if ! grep -q "JWT_REFRESH_SECRET" .env; then
-        warn "JWT_REFRESH_SECRET non trouvé dans .env"
-        warn "IMPORTANT: Ajoutez JWT_REFRESH_SECRET dans .env avant de continuer"
+    if ! grep -q "JWT_REFRESH_SECRET" "$ENV_FILE"; then
+        warn "JWT_REFRESH_SECRET non trouvé dans $ENV_FILE"
+        warn "IMPORTANT: Ajoutez JWT_REFRESH_SECRET dans $ENV_FILE avant de continuer"
         warn "Générez avec: openssl rand -base64 32"
     fi
 else
-    error "Fichier .env introuvable. Créez-le avec les variables nécessaires."
+    error "Fichier $ENV_FILE introuvable. Créez-le avec les variables nécessaires."
     exit 1
 fi
 
