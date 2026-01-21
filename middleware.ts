@@ -138,5 +138,8 @@ export const config = {
     // Inclure explicitement toutes les routes API (syntaxe Next.js)
     "/api/(.*)",
   ],
+  // Forcer le runtime Node.js au lieu de Edge Runtime
+  // Nécessaire car jsonwebtoken utilise le module Node.js 'crypto'
+  runtime: 'nodejs',
 }
 
