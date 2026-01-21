@@ -11,15 +11,9 @@ import { env } from "./env"
 const JWT_SECRET = env.JWT_SECRET || process.env.JWT_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-secret-change-in-production-min-32-chars")
 const JWT_REFRESH_SECRET = env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === "production" ? "" : "dev-refresh-secret-change-in-production-min-32-chars")
 
-// Vérifier que les secrets sont définis en production
-if (process.env.NODE_ENV === "production") {
-  if (!JWT_SECRET || JWT_SECRET.length < 32) {
-    throw new Error("JWT_SECRET doit être défini et contenir au moins 32 caractères en production")
-  }
-  if (!JWT_REFRESH_SECRET || JWT_REFRESH_SECRET.length < 32) {
-    throw new Error("JWT_REFRESH_SECRET doit être défini et contenir au moins 32 caractères en production")
-  }
-}
+// Vérifier que les secrets sont définis en production (seulement au runtime, pas au build)
+// On ne peut pas vérifier au build car les variables d'environnement peuvent ne pas être chargées
+// La vérification se fera au runtime dans les fonctions signAccessToken et signRefreshToken
 
 // Durée de vie des tokens (en secondes)
 const ACCESS_TOKEN_EXPIRES_IN = 15 * 60 // 15 minutes
@@ -43,10 +37,13 @@ export function signAccessToken(payload: Omit<JWTPayload, "iat" | "exp">): strin
   console.log(`[JWT] JWT_SECRET défini: ${!!JWT_SECRET}`)
   console.log(`[JWT] Longueur JWT_SECRET: ${JWT_SECRET ? JWT_SECRET.length : 0}`)
 
-  if (!JWT_SECRET || JWT_SECRET.length < 32) {
-    const errorMsg = `JWT_SECRET invalide ou manquant lors de la signature (longueur: ${JWT_SECRET ? JWT_SECRET.length : 0})`
-    console.error(`[JWT] ERREUR: ${errorMsg}`)
-    throw new Error(errorMsg)
+  // Vérifier au runtime (pas au build)
+  if (process.env.NODE_ENV === "production") {
+    if (!JWT_SECRET || JWT_SECRET.length < 32) {
+      const errorMsg = `JWT_SECRET invalide ou manquant lors de la signature (longueur: ${JWT_SECRET ? JWT_SECRET.length : 0})`
+      console.error(`[JWT] ERREUR: ${errorMsg}`)
+      throw new Error(errorMsg)
+    }
   }
 
   const token = jwt.sign(payload, JWT_SECRET, {
@@ -63,6 +60,15 @@ export function signAccessToken(payload: Omit<JWTPayload, "iat" | "exp">): strin
  * Génère un token JWT de rafraîchissement
  */
 export function signRefreshToken(payload: Omit<JWTPayload, "iat" | "exp">): string {
+  // Vérifier au runtime (pas au build)
+  if (process.env.NODE_ENV === "production") {
+    if (!JWT_REFRESH_SECRET || JWT_REFRESH_SECRET.length < 32) {
+      const errorMsg = `JWT_REFRESH_SECRET invalide ou manquant lors de la signature (longueur: ${JWT_REFRESH_SECRET ? JWT_REFRESH_SECRET.length : 0})`
+      console.error(`[JWT] ERREUR: ${errorMsg}`)
+      throw new Error(errorMsg)
+    }
+  }
+  
   return jwt.sign(
     {
       userId: payload.userId,
@@ -89,10 +95,13 @@ export function verifyAccessToken(token: string): JWTPayload {
     console.log(`[JWT] Longueur JWT_SECRET: ${JWT_SECRET ? JWT_SECRET.length : 0}`)
     console.log(`[JWT] Token (premiers 30 chars): ${token.substring(0, 30)}...`)
 
-    if (!JWT_SECRET || JWT_SECRET.length < 32) {
-      const errorMsg = `JWT_SECRET invalide ou manquant (longueur: ${JWT_SECRET ? JWT_SECRET.length : 0})`
-      console.error(`[JWT] ERREUR: ${errorMsg}`)
-      throw new Error(errorMsg)
+    // Vérifier au runtime (pas au build)
+    if (process.env.NODE_ENV === "production") {
+      if (!JWT_SECRET || JWT_SECRET.length < 32) {
+        const errorMsg = `JWT_SECRET invalide ou manquant (longueur: ${JWT_SECRET ? JWT_SECRET.length : 0})`
+        console.error(`[JWT] ERREUR: ${errorMsg}`)
+        throw new Error(errorMsg)
+      }
     }
 
     const decoded = jwt.verify(token, JWT_SECRET, {
