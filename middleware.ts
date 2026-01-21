@@ -25,8 +25,19 @@ export function middleware(request: NextRequest) {
   console.log(`[Middleware] Méthode: ${request.method}`)
 
   // Ignorer les routes publiques
-  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(route))
-  console.log(`[Middleware] Route publique: ${isPublicRoute}`)
+  // Vérifier d'abord les correspondances exactes, puis les startsWith avec un slash pour éviter les faux positifs
+  const isPublicRoute = publicRoutes.some((route) => {
+    if (pathname === route) return true
+    // Pour les routes qui commencent par, s'assurer qu'il y a un / après ou que c'est exact
+    if (pathname.startsWith(route)) {
+      // Si la route se termine par un chemin complet (pas juste un préfixe)
+      // Par exemple: "/api/auth/login" devrait matcher "/api/auth/login" mais pas "/api/auth/login/verify"
+      const remainingPath = pathname.substring(route.length)
+      return remainingPath === '' || remainingPath.startsWith('/')
+    }
+    return false
+  })
+  console.log(`[Middleware] Route publique: ${isPublicRoute} (pathname: ${pathname})`)
   
   if (isPublicRoute) {
     console.log(`[Middleware] Route publique détectée, passage sans vérification`)
