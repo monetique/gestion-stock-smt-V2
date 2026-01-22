@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db"
 import type { ApiResponse } from "@/lib/api-types"
 import type { Movement } from "@/lib/types"
 import { logAudit } from "@/lib/audit-logger"
+import { verifyAuth } from "@/lib/auth-middleware"
 
 // GET /api/movements - Récupérer tous les mouvements
 
@@ -137,27 +138,27 @@ export async function GET(request: NextRequest) {
 // POST /api/movements - Créer un nouveau mouvement
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-
-    // Récupérer l'utilisateur depuis le header
-    const userHeader = request.headers.get("x-user-data")
-    let userData = null
+    // Vérifier l'authentification JWT
+    let userData
     try {
-      if (userHeader) {
-        userData = JSON.parse(userHeader)
-      }
+      userData = verifyAuth(request)
     } catch (error) {
-      console.error('Error parsing user header:', error)
+      const errorMessage = error instanceof Error ? error.message : "Token invalide"
+      return NextResponse.json<ApiResponse>(
+        {
+          success: false,
+          error: `Authentification requise. ${errorMessage}`,
+        },
+        { status: 401 },
+      )
     }
 
-    // Utiliser userId du header si disponible, sinon du body
-    const userId = userData?.id || body.userId
+    const body = await request.json()
+    const userId = userData.id
 
     // Log pour déboguer
-    console.log('POST /api/movements - userId from header:', userData?.id)
-    console.log('POST /api/movements - userId from body:', body.userId)
-    console.log('POST /api/movements - final userId:', userId)
-    console.log('POST /api/movements - userHeader raw:', userHeader)
+    console.log('POST /api/movements - userId from JWT:', userId)
+    console.log('POST /api/movements - user email:', userData.email)
 
           // Validation des champs requis
           if (!body.cardId || !body.movementType || !body.quantity) {
@@ -181,24 +182,14 @@ export async function POST(request: NextRequest) {
             )
           }
 
-    if (!userId) {
-      return NextResponse.json<ApiResponse>(
-        {
-          success: false,
-          error: "Utilisateur non identifié. Veuillez vous reconnecter.",
-        },
-        { status: 401 },
-      )
-    }
-
-    // Vérifier que l'utilisateur existe
+    // Vérifier que l'utilisateur existe dans la base de données
     const user = await prisma.user.findUnique({ where: { id: userId } })
     if (!user) {
       console.error(`User not found in database: ${userId}`)
       console.error(`Available users in database:`, await prisma.user.findMany({ select: { id: true, email: true } }))
       
-      // Si l'utilisateur n'existe pas, suggérer de vérifier l'email depuis le header
-      const userEmail = userData?.email || 'non spécifié'
+      // Si l'utilisateur n'existe pas, suggérer de vérifier l'email depuis le JWT
+      const userEmail = userData.email || 'non spécifié'
       return NextResponse.json<ApiResponse>(
         {
           success: false,
