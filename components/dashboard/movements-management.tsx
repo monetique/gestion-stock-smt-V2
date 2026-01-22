@@ -24,7 +24,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useDataSync, useAutoRefresh } from "@/hooks/use-data-sync"
 import type { Movement, Card as CardType, Location, Bank } from "@/lib/types"
 import { Filter, ChevronLeft, ChevronRight } from "lucide-react"
-import { getAuthHeaders } from "@/lib/api-client"
+import { getAuthHeaders, authenticatedFetch } from "@/lib/api-client"
 import {
   Pagination,
   PaginationContent,
@@ -1127,7 +1127,7 @@ export default function MovementsManagement() {
           toLocationId: formData.movementType === "exit" ? null : formData.toLocationId || null,
         }
 
-        const response = await fetch('/api/movements', {
+        const response = await authenticatedFetch('/api/movements', {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify(movementData)
